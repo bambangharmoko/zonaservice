@@ -303,7 +303,7 @@ export default function IndexPage() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
                   </span>
-                  <span>SUMTRA Real-Time Tracker • Terhubung Database Toko</span>
+                  <span>Zona Service Real-Time Tracker • Terhubung Database Toko</span>
                 </div>
               </motion.div>
 
@@ -323,7 +323,7 @@ export default function IndexPage() {
                 variants={itemVariants}
                 className="text-slate-400 text-sm sm:text-base md:text-lg mb-8 leading-relaxed max-w-2xl mx-auto font-normal"
               >
-                Pantau progres reparasi laptop, PC desktop, CCTV, dan klaim garansi resmi ASUS langsung dari meja teknisi Super Komputer Balikpapan.
+                Pantau progres reparasi laptop, PC desktop, CCTV, dan klaim garansi resmi ASUS langsung dari meja teknisi Zona Service Balikpapan.
               </motion.p>
 
               {/* Primary Focal Point: The Tracking Command Bar */}
@@ -384,7 +384,7 @@ export default function IndexPage() {
                         if (sample === "Cek via Nomor HP") {
                           setSearchInput("0811");
                         } else if (sample === "Klaim ASUS") {
-                          openBot("Bagaimana prosedur klaim garansi resmi ASUS di Super Komputer?");
+                          openBot("Bagaimana prosedur klaim garansi resmi ASUS di Zona Service?");
                         } else {
                           setSearchInput(sample);
                           handleSearch(sample);
@@ -541,7 +541,7 @@ export default function IndexPage() {
             {/* Section Header */}
             <div className="text-center max-w-2xl mx-auto mb-12">
               <motion.span variants={itemVariants} className="text-[11px] font-bold text-blue-400 tracking-widest uppercase mb-2 inline-block">
-                Standar Layanan Super Komputer
+                Standar Layanan Zona Service
               </motion.span>
               <motion.h2 variants={itemVariants} className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">
                 Transparansi & Keandalan Servis
@@ -781,11 +781,11 @@ export default function IndexPage() {
                 <div className="mt-5 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
                   <span className="text-xs text-slate-400">Ingin tahu estimasi biaya untuk tipe laptop atau kendala Anda?</span>
                   <button
-                    onClick={() => openBot("Berapa estimasi biaya servis dan sparepart di Super Komputer?")}
+                    onClick={() => openBot("Berapa estimasi biaya servis dan sparepart di Zona Service?")}
                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 text-xs font-semibold transition-all cursor-pointer"
                   >
                     <Bot className="h-3.5 w-3.5" />
-                    <span>Tanya Estimasi ke SUMTRA AI</span>
+                    <span>Tanya Estimasi ke Zona Service AI</span>
                   </button>
                 </div>
               </motion.div>
@@ -794,7 +794,7 @@ export default function IndexPage() {
           </motion.div>
         </section>
 
-        {/* ═══ SUMTRA AI CONSULTATION SECTION ═══ */}
+        {/* ═══ ZONA SERVICE AI CONSULTATION SECTION ═══ */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
           <motion.div
             initial="hidden"
@@ -811,13 +811,13 @@ export default function IndexPage() {
               <div>
                 <motion.div variants={itemVariants} className="inline-flex items-center gap-2 bg-blue-600/15 border border-blue-500/30 rounded-full px-3.5 py-1 mb-4">
                   <Sparkles className="h-3.5 w-3.5 text-blue-400" />
-                  <span className="text-xs font-semibold text-blue-300 tracking-wide">SUMTRA AI Tech & Care</span>
+                  <span className="text-xs font-semibold text-blue-300 tracking-wide">Zona Service AI Tech & Care</span>
                 </motion.div>
 
                 <motion.h2 variants={itemVariants} className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-tight mb-4 tracking-tight">
                   Konsultasi Instan dengan{" "}
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-300">
-                    SUMTRA AI
+                    Zona Service AI
                   </span>
                 </motion.h2>
 
@@ -829,7 +829,7 @@ export default function IndexPage() {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => openBot("Halo SUMTRA AI, tolong jelaskan layanan apa saja yang ada di Super Komputer.")}
+                    onClick={() => openBot("Halo Zona Service AI, tolong jelaskan layanan apa saja yang ada di Zona Service.")}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
                   >
                     <Bot className="h-4 w-4" />
@@ -862,7 +862,7 @@ export default function IndexPage() {
                     iconColor: "text-emerald-400",
                     title: "Authorized ASUS",
                     desc: "Klaim garansi & perbaikan resmi",
-                    prompt: "Apakah Super Komputer melayani klaim garansi resmi ASUS?",
+                    prompt: "Apakah Zona Service melayani klaim garansi resmi ASUS?",
                   },
                   {
                     icon: Wrench,
@@ -876,7 +876,7 @@ export default function IndexPage() {
                     iconColor: "text-sky-400",
                     title: "Jam & Lokasi",
                     desc: "Info operasional Jl. Ahmad Yani",
-                    prompt: "Toko Super Komputer buka jam berapa dan dimana alamat lengkapnya?",
+                    prompt: "Toko Zona Service buka jam berapa dan dimana alamat lengkapnya?",
                   },
                 ].map((card) => (
                   <motion.div
@@ -944,7 +944,7 @@ export default function IndexPage() {
           >
             <div>
               <span className="text-[11px] font-bold text-blue-400 tracking-widest uppercase mb-1 block">Toko Online Resmi</span>
-              <h3 className="text-lg sm:text-xl font-bold text-white mb-1">Tokopedia Super Komputer Balikpapan</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-white mb-1">Tokopedia Zona Service Balikpapan</h3>
               <p className="text-slate-400 text-xs sm:text-sm">Beli laptop, PC built-up, komponen rakitan, dan aksesoris original dengan pengiriman aman.</p>
             </div>
             <motion.a
@@ -1033,8 +1033,8 @@ export default function IndexPage() {
             </div>
 
             <div className="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-500 text-[11px]">
-              <span>© {new Date().getFullYear()} Super Komputer Balikpapan. Hak Cipta Dilindungi.</span>
-              <span>SUMTRA Platform v2.0 • Real-Time Management & Tracking</span>
+              <span>© {new Date().getFullYear()} Zona Service Balikpapan. Hak Cipta Dilindungi.</span>
+              <span>Zona Service Platform v2.0 • Real-Time Management & Tracking</span>
             </div>
           </div>
         </footer>

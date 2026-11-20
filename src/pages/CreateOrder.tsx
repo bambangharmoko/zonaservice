@@ -442,7 +442,7 @@ const openTicketWhatsAppMessage = ({
   currentStatus: string;
 }) => {
   const trackLink = `${window.location.origin}/track/${ticketNumber}`;
-  const message = `Halo *${customerName}*, terima kasih telah mempercayakan perbaikan unit Anda di *Toko Super Komputer*. Berikut adalah rangkuman detail tiket penerimaan servis Anda:
+  const message = `Halo *${customerName}*, terima kasih telah mempercayakan perbaikan unit Anda di *Zona Service*. Berikut adalah rangkuman detail tiket penerimaan servis Anda:
 
 🧾 *Nomor Tiket:* ${ticketNumber}
 📅 *Tanggal Masuk:* ${entryDate}
@@ -497,7 +497,7 @@ const openMultiTicketWhatsAppMessage = ({
     )
     .join("\n\n");
 
-  const message = `Halo *${customerName}*, terima kasih telah mempercayakan perbaikan unit Anda di *Toko Super Komputer*. Berikut adalah rangkuman ${tickets.length} tiket penerimaan servis Anda:
+  const message = `Halo *${customerName}*, terima kasih telah mempercayakan perbaikan unit Anda di *Zona Service*. Berikut adalah rangkuman ${tickets.length} tiket penerimaan servis Anda:
 
 📅 *Tanggal Masuk:* ${entryDate}
 

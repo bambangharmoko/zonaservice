@@ -950,7 +950,7 @@ export default function OrderDetailPage() {
       `⏱️ *Estimasi Durasi:* ${confirmDuration.trim()}\n\n` +
       `Mohon konfirmasi persetujuan Anda untuk melanjutkan pengerjaan.\n\n` +
       `🔗 Lacak status: ${link}\n\n` +
-      `Salam,\n*Super Komputer Service*`,
+      `Salam,\n*Zona Service*`,
     );
     const cleanPhone = order.customer_phone.replace(/\D/g, "");
     const waPhone = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
@@ -1484,7 +1484,7 @@ export default function OrderDetailPage() {
     const date = new Date(order.created_at).toLocaleDateString("id-ID");
     const unitName = [order.device_brand, order.device_model].filter(Boolean).join(" ") || order.device_type || "-";
     const msg = encodeURIComponent(
-      `Halo *${order.customer_name}*, terima kasih telah mempercayakan perbaikan unit Anda di *Toko Super Komputer*. Berikut adalah rangkuman detail tiket penerimaan servis Anda:\n\n` +
+      `Halo *${order.customer_name}*, terima kasih telah mempercayakan perbaikan unit Anda di *Zona Service*. Berikut adalah rangkuman detail tiket penerimaan servis Anda:\n\n` +
       `🧾 *Nomor Tiket:* ${order.ticket_number}\n\n` +
       `📅 *Tanggal Masuk:* ${date}\n\n` +
       `🔧 *Tipe Servis:* ${order.service_type || "-"}\n\n` +
@@ -1568,7 +1568,7 @@ export default function OrderDetailPage() {
 
             <div className="text-center flex-1 px-2">
               <h1 className="text-base font-bold uppercase mb-0.5">Formulir Tanda Terima Servis / Perbaikan</h1>
-              <h2 className="text-sm font-bold">Super Komputer</h2>
+              <h2 className="text-sm font-bold">Zona Service</h2>
               <p className="text-[9px]">Jl Ahmad Yani No 118 | Telp/WA: 0811-5404-999 | IG: @superkomputer | Tokopedia: superkomputer </p>
             </div>
 
@@ -2852,8 +2852,8 @@ export default function OrderDetailPage() {
                 <Label htmlFor="cc">Cancel by Customer</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Cancel by Super Komputer" id="cs" />
-                <Label htmlFor="cs">Cancel by Super Komputer</Label>
+                <RadioGroupItem value="Cancel by Zona Service" id="cs" />
+                <Label htmlFor="cs">Cancel by Zona Service</Label>
               </div>
             </RadioGroup>
             <div className="space-y-2">

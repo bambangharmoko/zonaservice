@@ -1,7 +1,7 @@
 {
-  "name": "SUMTRA - Super Komputer Balikpapan",
-  "short_name": "SUMTRA",
-  "description": "SUMTRA - Super Ultima Management, Tracking & Real-Time Application. Layanan servis komputer & laptop Balikpapan.",
+  "name": "Zona Service App",
+  "short_name": "Zona Service App",
+  "description": "Zona Service App - Layanan servis komputer & laptop dan sistem pelacakan tiket servis real-time Balikpapan.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -88,7 +88,7 @@
       "sizes": "780x1688",
       "type": "image/jpeg",
       "form_factor": "narrow",
-      "label": "SUMTRA - Lacak status servis secara real-time"
+      "label": "Zona Service - Lacak status servis secara real-time"
     }
   ]
 }

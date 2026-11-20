@@ -292,7 +292,7 @@ export default function OrdersPage() {
     const date = new Date(order.created_at).toLocaleDateString("id-ID");
     const unitName = [order.device_brand, order.device_model].filter(Boolean).join(" ") || order.device_type || "-";
     const msg = encodeURIComponent(
-      `Halo *${order.customer_name}*, terima kasih telah mempercayakan perbaikan unit Anda di *Toko Super Komputer*. Berikut adalah rangkuman detail tiket penerimaan servis Anda:\n\n` +
+      `Halo *${order.customer_name}*, terima kasih telah mempercayakan perbaikan unit Anda di *Zona Service*. Berikut adalah rangkuman detail tiket penerimaan servis Anda:\n\n` +
       `🧾 *Nomor Tiket:* ${order.ticket_number}\n\n` +
       `📅 *Tanggal Masuk:* ${date}\n\n` +
       `🔧 *Tipe Servis:* ${order.service_type || "-"}\n\n` +

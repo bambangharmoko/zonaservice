@@ -143,7 +143,7 @@ export function PWAInstallPrompt() {
                 {/* Text */}
                 <div className="flex-1 min-w-0 pr-6">
                   <p className="font-bold text-sm text-foreground leading-tight">
-                    SUMTRA
+                    Zona Service App
                   </p>
                   <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 max-w-[200px] sm:max-w-xs leading-tight">
                     Install aplikasi untuk pengalaman lebih cepat
@@ -208,7 +208,7 @@ export function PWAInstallPrompt() {
                 </div>
                 <div className="flex-1 min-w-0 pr-6">
                   <p className="font-bold text-sm text-foreground leading-tight">
-                    Install SUMTRA
+                    Install Zona Service App
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Tambahkan ke Home Screen:

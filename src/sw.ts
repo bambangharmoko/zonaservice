@@ -157,13 +157,13 @@ self.addEventListener("push", (event: PushEvent) => {
   const notification = payload.notification || {};
   const data = payload.data || {};
 
-  const title = notification.title || data.title || "SUMTRA";
+  const title = notification.title || data.title || "Zona Service";
   const body = notification.body || data.body || "";
   const icon = notification.icon || "/icon-192.png";
   const badge = notification.badge || "/icon-192.png";
   
   // Tag penting agar OS (Android/iOS) bisa meng-overwrite notifikasi ganda
-  const tag = data.order_id ? `staff-ticket-${data.order_id}` : (data.ticket_number || "sumtra-push");
+  const tag = data.order_id ? `staff-ticket-${data.order_id}` : (data.ticket_number || "zonaservice-push");
 
   // Tentukan URL target berdasarkan konteks notifikasi
   const targetUrl =

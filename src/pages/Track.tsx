@@ -271,7 +271,7 @@ export default function TrackPage() {
 
           <div className="text-center flex-1 px-2">
             <h1 className="text-base font-bold uppercase mb-0.5">Formulir Tanda Terima Servis / Perbaikan</h1>
-            <h2 className="text-sm font-bold">Super Komputer</h2>
+            <h2 className="text-sm font-bold">Zona Service</h2>
             <p className="text-[9px]">Jl Ahmad Yani No 118 | Telp/WA: 0811-5404-999 | IG: @superkomputer | Tokopedia: superkomputer </p>
           </div>
 
@@ -381,7 +381,7 @@ export default function TrackPage() {
               </tr>
               <tr>
                 <td><strong>Nama: {order.customer_name || "................................................."}</strong></td>
-                <td><strong>Nama: Super Komputer</strong></td>
+                <td><strong>Nama: Zona Service</strong></td>
               </tr>
             </tbody>
           </table>

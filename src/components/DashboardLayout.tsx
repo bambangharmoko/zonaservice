@@ -79,10 +79,10 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-br from-primary to-blue-600 bg-clip-text text-transparent">
-              SUMTRA
+              Zona Service
             </h1>
           </div>
-          <p className="text-[10px] leading-tight text-sidebar-foreground/60 mt-0.5">Super Ultima Management, Tracking & Real-Time Application</p>
+          <p className="text-[10px] leading-tight text-sidebar-foreground/60 mt-0.5">Sistem Manajemen & Pelacakan Servis Real-Time</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
@@ -140,7 +140,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             <AppLogo className="h-7 w-7 sm:h-8 sm:w-8" />
             {!sidebarOpen && (
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight bg-gradient-to-br from-primary to-blue-600 bg-clip-text text-transparent">
-                SUMTRA
+                Zona Service
               </h1>
             )}
           </button>

@@ -37,7 +37,7 @@ export function OpenInAppBanner() {
           <AppLogo className="w-10 h-10 rounded-xl shadow-md shrink-0 bg-primary/10 p-1" />
           <div className="min-w-0">
             <h4 className="text-xs font-bold text-foreground truncate">
-              Buka di Aplikasi SUMTRA
+              Buka di Aplikasi Zona Service App
             </h4>
             <p className="text-[11px] text-muted-foreground truncate">
               Akses lebih cepat, stabil, dan notifikasi real-time

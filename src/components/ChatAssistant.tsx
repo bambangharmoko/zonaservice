@@ -31,17 +31,17 @@ interface ChatMessage {
 const INITIAL_GREETING: ChatMessage = {
   id: "welcome-msg",
   sender: "bot",
-  text: `Halo! 👋 Selamat datang di **Super Komputer Balikpapan** (SUMTRA). Saya **SUMTRA AI**, asisten AI pintar Anda.\n\nSaya bisa membantu Anda:\n- 🔍 **Cek Status Servis Real-time** (sebutkan nomor tiket Anda, contoh: *F26001*, atau nomor HP terdaftar)\n- ⏳ **Cek Sisa Masa Garansi Toko** (1 Bulan Hardware / 1 Minggu Software)\n- 💻 **Konsultasi Servis & Troubleshooting** Laptop, PC Desktop, CCTV, & Jaringan\n- 🛡️ **Info Layanan Authorized Service Resmi ASUS & Multi-Brand Non-Garansi**\n- 🔑 **Penjualan Lisensi Resmi Windows & Office Original (Rp 150.000)**\n- ⏱️ **Jam Operasional, Lokasi, & Estimasi Biaya Servis**\n\nAda yang bisa saya bantu hari ini?`,
+  text: `Halo! 👋 Selamat datang di **Zona Service Balikpapan**. Saya **Zona Service AI**, asisten AI pintar Anda.\n\nSaya bisa membantu Anda:\n- 🔍 **Cek Status Servis Real-time** (sebutkan nomor tiket Anda, contoh: *F26001*, atau nomor HP terdaftar)\n- ⏳ **Cek Sisa Masa Garansi Toko** (1 Bulan Hardware / 1 Minggu Software)\n- 💻 **Konsultasi Servis & Troubleshooting** Laptop, PC Desktop, CCTV, & Jaringan\n- 🛡️ **Info Layanan Authorized Service Resmi ASUS & Multi-Brand Non-Garansi**\n- 🔑 **Penjualan Lisensi Resmi Windows & Office Original (Rp 150.000)**\n- ⏱️ **Jam Operasional, Lokasi, & Estimasi Biaya Servis**\n\nAda yang bisa saya bantu hari ini?`,
   timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
 };
 
 const QUICK_PROMPTS = [
   { label: "🔍 Cek Status Servis", prompt: "Saya ingin mengecek status pengerjaan tiket servis saya." },
-  { label: "⏳ Cek Masa Garansi Toko", prompt: "Saya pernah servis di Super Komputer dan sudah selesai. Apakah bisa bantu cek sisa masa garansi unit saya?" },
-  { label: "🛡️ Garansi Resmi ASUS", prompt: "Bagaimana prosedur klaim garansi resmi ASUS di Super Komputer?" },
+  { label: "⏳ Cek Masa Garansi Toko", prompt: "Saya pernah servis di Zona Service dan sudah selesai. Apakah bisa bantu cek sisa masa garansi unit saya?" },
+  { label: "🛡️ Garansi Resmi ASUS", prompt: "Bagaimana prosedur klaim garansi resmi ASUS di Zona Service?" },
   { label: "💻 Servis Laptop Multi-Brand", prompt: "Apakah melayani servis laptop Lenovo, Acer, HP, Dell yang mati total atau rusak hardware?" },
-  { label: "🔑 Lisensi Windows/Office", prompt: "Berapa harga lisensi resmi Windows dan Office original di Super Komputer?" },
-  { label: "📍 Jam Buka & Lokasi", prompt: "Dimana alamat toko Super Komputer Balikpapan dan jam operasionalnya?" },
+  { label: "🔑 Lisensi Windows/Office", prompt: "Berapa harga lisensi resmi Windows dan Office original di Zona Service?" },
+  { label: "📍 Jam Buka & Lokasi", prompt: "Dimana alamat toko Zona Service Balikpapan dan jam operasionalnya?" },
 ];
 
 export function ChatAssistant() {
@@ -360,9 +360,9 @@ export function ChatAssistant() {
               <div className="flex items-start justify-between gap-2 mb-1">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                   <div className="w-4 h-4 rounded-full bg-white p-0.5 border border-primary/20 flex items-center justify-center overflow-hidden shrink-0">
-                    <img src="/sumtra_v2.gif" alt="SUMTRA AI" className="w-full h-full object-contain" />
+                    <img src="/sumtra_v2.gif" alt="Zona Service AI" className="w-full h-full object-contain" />
                   </div>
-                  <span>SUMTRA AI</span>
+                  <span>Zona Service AI</span>
                 </div>
                 <button
                   onClick={(e) => {
@@ -375,7 +375,7 @@ export function ChatAssistant() {
                 </button>
               </div>
               <p className="text-xs text-muted-foreground leading-snug">
-                Halo! Ada yang perlu dicek? Tanya status servis, troubleshooting, atau harga ke SUMTRA AI!
+                Halo! Ada yang perlu dicek? Tanya status servis, troubleshooting, atau harga ke Zona Service AI!
               </p>
             </motion.div>
           )}
@@ -390,18 +390,18 @@ export function ChatAssistant() {
             setIsOpen((prev) => !prev);
           }}
           className="relative flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-blue-600 via-primary to-blue-700 text-white rounded-full shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all group"
-          aria-label="Buka Chatbot SUMTRA AI"
+          aria-label="Buka Chatbot Zona Service AI"
         >
           <div className="relative">
             <div className="w-6 h-6 rounded-full bg-white p-0.5 flex items-center justify-center overflow-hidden shadow-xs">
-              <img src="/sumtra_v2.gif" alt="SUMTRA AI" className="w-full h-full object-contain group-hover:scale-110 transition-transform" />
+              <img src="/sumtra_v2.gif" alt="Zona Service AI" className="w-full h-full object-contain group-hover:scale-110 transition-transform" />
             </div>
             <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
           </div>
-          <span className="font-semibold text-sm tracking-wide hidden sm:inline">Tanya SUMTRA AI</span>
+          <span className="font-semibold text-sm tracking-wide hidden sm:inline">Tanya Zona Service AI</span>
         </motion.button>
       </div>
 
@@ -422,13 +422,13 @@ export function ChatAssistant() {
             <div className="bg-gradient-to-r from-sidebar via-sidebar to-sidebar/95 text-sidebar-foreground px-4 py-3 border-b border-sidebar-border flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-white p-1 border border-sidebar-border/40 flex items-center justify-center relative shrink-0 shadow-sm overflow-hidden">
-                  <img src="/sumtra_v2.gif" alt="SUMTRA AI" className="w-full h-full object-contain" />
+                  <img src="/sumtra_v2.gif" alt="Zona Service AI" className="w-full h-full object-contain" />
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-sidebar" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-sm sm:text-base text-sidebar-primary-foreground tracking-wide">
-                      SUMTRA AI
+                      Zona Service AI
                     </h3>
                     <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -480,7 +480,7 @@ export function ChatAssistant() {
                   >
                     {isBot && (
                       <div className="w-7 h-7 rounded-full bg-white border border-border shadow-xs flex items-center justify-center shrink-0 mt-0.5 p-0.5 overflow-hidden">
-                        <img src="/sumtra_v2.gif" alt="SUMTRA AI" className="w-full h-full object-contain" />
+                        <img src="/sumtra_v2.gif" alt="Zona Service AI" className="w-full h-full object-contain" />
                       </div>
                     )}
                     <div
@@ -510,11 +510,11 @@ export function ChatAssistant() {
               {loading && (
                 <div className="flex items-start gap-2.5 justify-start">
                   <div className="w-7 h-7 rounded-full bg-white border border-border shadow-xs flex items-center justify-center shrink-0 mt-0.5 p-0.5 overflow-hidden">
-                    <img src="/sumtra_v2.gif" alt="SUMTRA AI" className="w-full h-full object-contain" />
+                    <img src="/sumtra_v2.gif" alt="Zona Service AI" className="w-full h-full object-contain" />
                   </div>
                   <div className="bg-card border border-border text-card-foreground rounded-2xl rounded-tl-none px-4 py-3 text-sm shadow-sm flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                    <span className="text-xs text-muted-foreground">SUMTRA AI sedang memeriksa data & menganalisa...</span>
+                    <span className="text-xs text-muted-foreground">Zona Service AI sedang memeriksa data & menganalisa...</span>
                   </div>
                 </div>
               )}
@@ -565,13 +565,13 @@ export function ChatAssistant() {
             {/* Sub-footer quick WA link */}
             <div className="px-3 py-1.5 bg-muted/40 text-[10px] text-muted-foreground flex items-center justify-between border-t border-border/30">
               <span className="flex items-center gap-1">
-                <Info className="w-3 h-3 text-primary" /> Powered by SUMTRA AI Agent
+                <Info className="w-3 h-3 text-primary" /> Powered by Zona Service AI Agent
               </span>
               <a
                 href="https://wa.me/628115404999"
                 onClick={(e) => {
                   e.preventDefault();
-                  openDirectWhatsApp("628115404999", "Halo Admin Super Komputer, saya butuh bantuan.");
+                  openDirectWhatsApp("628115404999", "Halo Admin Zona Service, saya butuh bantuan.");
                 }}
                 className="text-primary hover:underline flex items-center gap-1 font-medium cursor-pointer"
               >

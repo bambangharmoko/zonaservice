@@ -1,6 +1,6 @@
-# 🖥️ Super Komputer App - Sistem Informasi Manajemen Servis & Pelacakan Tiket
+# 🖥️ Zona Service App - Sistem Informasi Manajemen Servis & Pelacakan Tiket
 
-Selamat datang di repositori proyek skripsi **Super Komputer App**, sebuah aplikasi berbasis web modern yang dirancang untuk mengelola operasional servis komputer/perangkat elektronik secara efisien dan transparan. Aplikasi ini dilengkapi dengan sistem pelacakan tiket realtime untuk pelanggan dan dashboard manajemen multi-role bagi internal toko.
+Selamat datang di repositori proyek skripsi **Zona Service App**, sebuah aplikasi berbasis web modern yang dirancang untuk mengelola operasional servis komputer/perangkat elektronik secara efisien dan transparan. Aplikasi ini dilengkapi dengan sistem pelacakan tiket realtime untuk pelanggan dan dashboard manajemen multi-role bagi internal toko.
 
 ---
 

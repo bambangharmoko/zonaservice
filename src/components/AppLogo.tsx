@@ -4,7 +4,7 @@ interface AppLogoProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   className?: string;
 }
 
-export function AppLogo({ className, alt = "SUMTRA", ...props }: AppLogoProps) {
+export function AppLogo({ className, alt = "Zona Service", ...props }: AppLogoProps) {
   return (
     <img
       src="/sumtra_v2.gif"
