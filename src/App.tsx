@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ProtectedRoute, OwnerRoute, AdminRoute, NonTechnicianRoute } from "@/components/ProtectedRoute";
+import { ProtectedRoute, OwnerRoute, AdminRoute, NonTechnicianRoute, FinanceRoute } from "@/components/ProtectedRoute";
 import { lazy, Suspense } from "react";
 import { AppLoading } from "@/components/AppLoading";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
@@ -26,6 +26,11 @@ const TechnicianWorkload = lazy(() => import("./pages/TechnicianWorkload"));
 const CustomerManagement = lazy(() => import("./pages/CustomerManagement"));
 const ClosedTicketsManager = lazy(() => import("./pages/ClosedTicketsManager"));
 const AiTraining = lazy(() => import("./pages/AiTraining"));
+const FinanceOverview = lazy(() => import("./pages/finance/FinanceOverview"));
+const FinancePOS = lazy(() => import("./pages/finance/FinancePOS"));
+const FinanceInventory = lazy(() => import("./pages/finance/FinanceInventory"));
+const FinanceExpenses = lazy(() => import("./pages/finance/FinanceExpenses"));
+const FinanceReports = lazy(() => import("./pages/finance/FinanceReports"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -58,6 +63,12 @@ const App = () => (
                 <Route path="/dashboard/users" element={<ProtectedRoute><OwnerRoute><UserManagement /></OwnerRoute></ProtectedRoute>} />
                 <Route path="/dashboard/closed-tickets" element={<ProtectedRoute><OwnerRoute><ClosedTicketsManager /></OwnerRoute></ProtectedRoute>} />
                 <Route path="/dashboard/ai-training" element={<ProtectedRoute><OwnerRoute><AiTraining /></OwnerRoute></ProtectedRoute>} />
+                {/* Sub-Dashboard Finance Routes */}
+                <Route path="/dashboard/finance" element={<ProtectedRoute><FinanceRoute><FinanceOverview /></FinanceRoute></ProtectedRoute>} />
+                <Route path="/dashboard/finance/pos" element={<ProtectedRoute><FinanceRoute><FinancePOS /></FinanceRoute></ProtectedRoute>} />
+                <Route path="/dashboard/finance/inventory" element={<ProtectedRoute><FinanceRoute><FinanceInventory /></FinanceRoute></ProtectedRoute>} />
+                <Route path="/dashboard/finance/expenses" element={<ProtectedRoute><FinanceRoute><FinanceExpenses /></FinanceRoute></ProtectedRoute>} />
+                <Route path="/dashboard/finance/reports" element={<ProtectedRoute><FinanceRoute><FinanceReports /></FinanceRoute></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

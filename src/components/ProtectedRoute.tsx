@@ -23,7 +23,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
     return <AppLoading />;
   }
 
-  if (!hasRole("owner") && !hasRole("admin")) return <Navigate to="/dashboard/orders" replace />;
+  if (!hasRole("owner") && !hasRole("admin") && !hasRole("finance")) return <Navigate to="/dashboard/orders" replace />;
 
   return <>{children}</>;
 }
@@ -36,7 +36,7 @@ export function NonTechnicianRoute({ children }: { children: ReactNode }) {
   }
 
   // Technicians go to orders instead of dashboard
-  if (hasRole("technician") && !hasRole("owner") && !hasRole("admin")) {
+  if (hasRole("technician") && !hasRole("owner") && !hasRole("admin") && !hasRole("finance")) {
     return <Navigate to="/dashboard/orders" replace />;
   }
 
@@ -51,6 +51,21 @@ export function OwnerRoute({ children }: { children: ReactNode }) {
   }
 
   if (!hasRole("owner")) return <Navigate to="/dashboard" replace />;
+
+  return <>{children}</>;
+}
+
+export function FinanceRoute({ children }: { children: ReactNode }) {
+  const { hasRole, loading } = useAuth();
+
+  if (loading) {
+    return <AppLoading />;
+  }
+
+  // Only owner and finance roles can access Finance sub-dashboard
+  if (!hasRole("owner") && !hasRole("finance")) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return <>{children}</>;
 }

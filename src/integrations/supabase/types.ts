@@ -507,7 +507,7 @@ export type Database = {
       lookup_login_email: { Args: { _identifier: string }; Returns: string }
     }
     Enums: {
-      app_role: "owner" | "admin" | "technician"
+      app_role: "owner" | "admin" | "technician" | "finance"
       service_status:
         | "Diterima"
         | "Diagnosa"
@@ -645,7 +645,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "admin", "technician"],
+      app_role: ["owner", "admin", "technician", "finance"],
       service_status: [
         "Diterima",
         "Diagnosa",

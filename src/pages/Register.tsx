@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"owner" | "admin" | "technician">("technician");
+  const [role, setRole] = useState<"owner" | "admin" | "technician" | "finance">("technician");
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -209,6 +209,7 @@ export default function RegisterPage() {
                 {[
                   { value: "owner", label: "Owner" },
                   { value: "admin", label: "Admin" },
+                  { value: "finance", label: "Finance / Keuangan" },
                   { value: "technician", label: "Teknisi" },
                 ].map((r) => (
                   <div key={r.value} className="flex items-center gap-2.5">

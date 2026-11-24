@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerSwAndGetToken, unregisterFCMToken, closeAllNotifications, isMessagingSupported } from "@/lib/firebase";
 import { useQueryClient } from "@tanstack/react-query";
 
-type AppRole = "owner" | "admin" | "technician";
+type AppRole = "owner" | "admin" | "technician" | "finance";
 
 interface AuthContextType {
   user: User | null;
