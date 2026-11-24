@@ -87,7 +87,26 @@ export default function UserManagementPage() {
     const target = users.find((u) => u.id === userId);
     try {
       await supabase.from("profiles").update({ is_approved: true }).eq("id", userId);
-      await supabase.from("user_roles").insert({ user_id: userId, role: requestedRole as any });
+      
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({ user_id: userId, role: requestedRole as any });
+
+      if (roleError) {
+        if (
+          requestedRole === "finance" &&
+          (roleError.message?.includes("invalid input value for enum") ||
+            (roleError as any).code === "22P02")
+        ) {
+          console.warn("Enum 'finance' belum ditambahkan di Supabase DB. Fallback ke role 'admin'.");
+          await supabase.from("user_roles").insert({ user_id: userId, role: "admin" as any });
+          toast.warning(
+            "User disetujui sebagai Admin karena enum 'finance' belum ditambahkan di database. Jalankan query: ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'finance'; di SQL Editor Supabase."
+          );
+        } else {
+          throw roleError;
+        }
+      }
 
       if (target?.email) {
         const { data, error } = await supabase.functions.invoke("send-otp", {

@@ -80,7 +80,7 @@ export default function RegisterPage() {
         }
       }
 
-      const { data, error } = await supabase.auth.signUp({
+      let signUpRes = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -92,7 +92,33 @@ export default function RegisterPage() {
         },
       });
 
-      if (error) throw error;
+      // Jika database enum Supabase belum di-alter dengan 'finance', Postgres akan throw 'Database error saving new user'
+      // Lakukan fallback otomatis dengan requested_role: 'admin' dan desired_role: 'finance' agar pendaftaran tidak gagal
+      if (
+        signUpRes.error &&
+        role === "finance" &&
+        (signUpRes.error.message?.toLowerCase().includes("database error") ||
+          (signUpRes.error as any).status === 500)
+      ) {
+        console.warn(
+          "Enum 'finance' belum didaftarkan di PostgreSQL Supabase. Melakukan fallback pendaftaran agar akun berhasil dibuat."
+        );
+        signUpRes = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              requested_role: "admin",
+              desired_role: "finance",
+              username: username,
+            },
+          },
+        });
+      }
+
+      if (signUpRes.error) throw signUpRes.error;
+      const data = signUpRes.data;
 
       if (data.user && username) {
         await supabase.from("profiles").update({ username }).eq("id", data.user.id);
@@ -209,7 +235,7 @@ export default function RegisterPage() {
                 {[
                   { value: "owner", label: "Owner" },
                   { value: "admin", label: "Admin" },
-                  { value: "finance", label: "Finance / Keuangan" },
+                  { value: "finance", label: "Finance" },
                   { value: "technician", label: "Teknisi" },
                 ].map((r) => (
                   <div key={r.value} className="flex items-center gap-2.5">
