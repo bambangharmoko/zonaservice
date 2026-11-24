@@ -42,11 +42,15 @@ export default function TechnicianWorkload() {
 
       const techIds = techRoles?.map((r) => r.user_id) || [];
 
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, full_name, username")
-        .in("id", techIds.length > 0 ? techIds : ["none"]);
-      if (profilesError) throw profilesError;
+      let profiles: { id: string; full_name: string; username: string | null }[] = [];
+      if (techIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, full_name, username")
+          .in("id", techIds);
+        if (profilesError) throw profilesError;
+        profiles = profilesData || [];
+      }
 
       const { data: orders, error: ordersError } = await supabase
         .from("service_orders")
@@ -80,7 +84,7 @@ export default function TechnicianWorkload() {
       });
     } catch (error) {
       console.error("Failed to fetch technician workload", error);
-      setFetchError(error instanceof Error ? error.message : "Koneksi terputus atau sesi habis");
+      setFetchError(error instanceof Error ? error.message : "Gagal memuat data pekerjaan teknisi");
     } finally {
       setLoading(false);
     }
@@ -158,7 +162,7 @@ export default function TechnicianWorkload() {
           <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
             <AlertTriangle className="h-8 w-8 text-destructive" />
             <div>
-              <p className="font-medium text-destructive">Koneksi terputus atau sesi habis.</p>
+              <p className="font-medium text-destructive">Gagal memuat data pekerjaan teknisi.</p>
               <p className="text-sm text-muted-foreground">{fetchError}</p>
             </div>
             <Button variant="outline" onClick={() => { setFetchError(null); setLoading(true); fetchData(); }}>
@@ -353,62 +357,78 @@ export default function TechnicianWorkload() {
         </div>
 
         {/* Technician list - clickable */}
-        <div className="space-y-2">
-          {techData.map((tech) => {
-            const techStaleCount = tech.tickets.filter(
-              (t) => Date.now() - new Date(t.updated_at).getTime() > 24 * 60 * 60 * 1000
-            ).length;
+        {techData.length === 0 ? (
+          <Card className="border-dashed bg-muted/20">
+            <CardContent className="flex flex-col items-center justify-center p-8 text-center gap-3">
+              <div className="p-3 rounded-full bg-muted text-muted-foreground">
+                <User className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-semibold text-base">Saat ini tidak ada teknisi satupun di sistem Zona Service</p>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  Belum ada staf dengan role teknisi yang terdaftar atau aktif. Anda dapat menambahkan atau mengatur role teknisi melalui menu Manajemen User.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {techData.map((tech) => {
+              const techStaleCount = tech.tickets.filter(
+                (t) => Date.now() - new Date(t.updated_at).getTime() > 24 * 60 * 60 * 1000
+              ).length;
 
-            return (
-              <Card
-                key={tech.id}
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setSelectedTech(tech)}
-              >
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-muted text-primary">
-                    <User className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold">{tech.full_name}</p>
-                      {tech.username && <span className="text-xs text-muted-foreground">@{tech.username}</span>}
-                      {techStaleCount > 0 && (
-                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                          ⚠️ {techStaleCount} Terlambat &gt;24j
-                        </Badge>
-                      )}
+              return (
+                <Card
+                  key={tech.id}
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setSelectedTech(tech)}
+                >
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-muted text-primary">
+                      <User className="h-5 w-5" />
                     </div>
-                    <div className="flex gap-2 mt-1 flex-wrap">
-                      {tech.tickets.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">Tidak ada tiket aktif</span>
-                      ) : (
-                        <>
-                          {Object.entries(
-                            tech.tickets.reduce((acc: Record<string, number>, t: any) => {
-                              acc[t.status] = (acc[t.status] || 0) + 1;
-                              return acc;
-                            }, {})
-                          ).map(([status, count]) => (
-                            <Badge key={status} variant="outline" className="text-xs gap-1">
-                              {status} <span className="font-bold">{count as number}</span>
-                            </Badge>
-                          ))}
-                        </>
-                      )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold">{tech.full_name}</p>
+                        {tech.username && <span className="text-xs text-muted-foreground">@{tech.username}</span>}
+                        {techStaleCount > 0 && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                            ⚠️ {techStaleCount} Terlambat &gt;24j
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        {tech.tickets.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">Tidak ada tiket aktif</span>
+                        ) : (
+                          <>
+                            {Object.entries(
+                              tech.tickets.reduce((acc: Record<string, number>, t: any) => {
+                                acc[t.status] = (acc[t.status] || 0) + 1;
+                                return acc;
+                              }, {})
+                            ).map(([status, count]) => (
+                              <Badge key={status} variant="outline" className="text-xs gap-1">
+                                {status} <span className="font-bold">{count as number}</span>
+                              </Badge>
+                            ))}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={tech.tickets.length > 5 ? "destructive" : "secondary"} className="text-lg px-3">
-                      {tech.tickets.length}
-                    </Badge>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={tech.tickets.length > 5 ? "destructive" : "secondary"} className="text-lg px-3">
+                        {tech.tickets.length}
+                      </Badge>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {/* Unassigned */}
         {unassigned.length > 0 && (
