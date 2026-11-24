@@ -27,6 +27,18 @@ export interface FinanceStockLog {
   created_at: string;
 }
 
+export interface TicketSparepart {
+  id: string;
+  product_id: string;
+  product_name: string;
+  sku?: string | null;
+  purchase_price: number;
+  selling_price: number;
+  quantity: number;
+  added_at: string;
+  added_by?: string;
+}
+
 export interface FinanceInvoiceItem {
   id: string;
   invoice_id: string;
@@ -36,12 +48,16 @@ export interface FinanceInvoiceItem {
   selling_price: number;
   quantity: number;
   subtotal: number;
+  is_from_ticket?: boolean;
   created_at?: string;
 }
 
 export interface FinanceInvoice {
   id: string;
   invoice_number: string;
+  ticket_id?: string | null;
+  ticket_number?: string | null;
+  device_info?: string | null;
   date: string;
   customer_name: string;
   customer_phone?: string | null;
@@ -397,12 +413,16 @@ export const financeService = {
   async createInvoice(payload: {
     customer_name: string;
     customer_phone?: string;
+    ticket_id?: string | null;
+    ticket_number?: string | null;
+    device_info?: string | null;
     items: {
       product_id?: string;
       product_name: string;
       purchase_price: number;
       selling_price: number;
       quantity: number;
+      is_from_ticket?: boolean;
     }[];
     discount_type: "fixed" | "percent";
     discount_value: number;
@@ -435,6 +455,9 @@ export const financeService = {
     const invoiceRecord: FinanceInvoice = {
       id: invoiceId,
       invoice_number,
+      ticket_id: payload.ticket_id || null,
+      ticket_number: payload.ticket_number || null,
+      device_info: payload.device_info || null,
       date: now.toISOString(),
       customer_name: payload.customer_name?.trim() || "Umum",
       customer_phone: payload.customer_phone?.trim() || null,
@@ -462,6 +485,7 @@ export const financeService = {
       selling_price: item.selling_price,
       quantity: item.quantity,
       subtotal: item.selling_price * item.quantity,
+      is_from_ticket: !!item.is_from_ticket,
       created_at: now.toISOString(),
     }));
 
@@ -508,9 +532,10 @@ export const financeService = {
       // Local fallback continues smoothly
     }
 
-    // 4. Deduct Stock for items that reference a product
+    // 4. Anti-Double Deduction:
+    // Only deduct stock for items that are NOT from service ticket (spareparts from ticket already deducted by technician!)
     for (const item of payload.items) {
-      if (item.product_id) {
+      if (item.product_id && !item.is_from_ticket) {
         try {
           await this.adjustStock(
             item.product_id,
@@ -524,7 +549,52 @@ export const financeService = {
       }
     }
 
-    // 5. Save to local storage
+    // 5. Anti-Double Billing:
+    // If invoice created from service ticket, mark ticket as invoiced
+    if (payload.ticket_id) {
+      try {
+        const { data: orderData } = await supabase
+          .from("service_orders")
+          .select("id, unit_checks")
+          .eq("id", payload.ticket_id)
+          .single();
+
+        const currentChecks = (orderData?.unit_checks || {}) as Record<string, any>;
+        const updatedChecks = {
+          ...currentChecks,
+          _invoice_status: "invoiced",
+          _invoice_id: invoiceRecord.id,
+          _invoice_number: invoiceRecord.invoice_number,
+          _invoiced_at: now.toISOString(),
+        };
+
+        await supabase
+          .from("service_orders")
+          .update({
+            unit_checks: updatedChecks as any,
+            final_cost: grand_total,
+          })
+          .eq("id", payload.ticket_id);
+      } catch (err) {
+        console.warn("Failed to mark service order as invoiced in Supabase:", err);
+      }
+
+      // Also mark local ticket cache
+      const localTicketsKey = "zs_unbilled_tickets_cache";
+      try {
+        const localCached = JSON.parse(localStorage.getItem(localTicketsKey) || "{}");
+        localCached[payload.ticket_id] = {
+          status: "invoiced",
+          invoice_number,
+          invoiced_at: now.toISOString(),
+        };
+        localStorage.setItem(localTicketsKey, JSON.stringify(localCached));
+      } catch {
+        // ignore
+      }
+    }
+
+    // 6. Save to local storage
     const localInvoices = getLocal<FinanceInvoice[]>(STORAGE_KEYS.INVOICES, []);
     setLocal(STORAGE_KEYS.INVOICES, [invoiceRecord, ...localInvoices]);
 
@@ -539,10 +609,10 @@ export const financeService = {
 
     const now = new Date().toISOString();
 
-    // 1. Restore Stock for each product in this invoice
+    // 1. Restore Stock ONLY for items that were retail (not from ticket, since ticket parts are managed on the ticket)
     if (invoice.items && invoice.items.length > 0) {
       for (const item of invoice.items) {
-        if (item.product_id) {
+        if (item.product_id && !item.is_from_ticket) {
           try {
             await this.adjustStock(
               item.product_id,
@@ -557,7 +627,44 @@ export const financeService = {
       }
     }
 
-    // 2. Update status in Supabase
+    // 2. If invoice was from a ticket, restore ticket status back to "unbilled"
+    if (invoice.ticket_id) {
+      try {
+        const { data: orderData } = await supabase
+          .from("service_orders")
+          .select("id, unit_checks")
+          .eq("id", invoice.ticket_id)
+          .single();
+
+        const currentChecks = (orderData?.unit_checks || {}) as Record<string, any>;
+        const updatedChecks = {
+          ...currentChecks,
+          _invoice_status: "unbilled",
+          _invoice_id: null,
+          _invoice_number: null,
+          _voided_at: now,
+        };
+
+        await supabase
+          .from("service_orders")
+          .update({ unit_checks: updatedChecks as any })
+          .eq("id", invoice.ticket_id);
+      } catch (err) {
+        console.warn("Failed to unmark ticket invoice status in Supabase:", err);
+      }
+
+      // Also revert local ticket cache
+      const localTicketsKey = "zs_unbilled_tickets_cache";
+      try {
+        const localCached = JSON.parse(localStorage.getItem(localTicketsKey) || "{}");
+        delete localCached[invoice.ticket_id];
+        localStorage.setItem(localTicketsKey, JSON.stringify(localCached));
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3. Update status in Supabase
     try {
       await supabase
         .from("finance_invoices" as any)
@@ -572,7 +679,7 @@ export const financeService = {
       // local fallback
     }
 
-    // 3. Update local storage
+    // 4. Update local storage
     const updatedInvoices = invoices.map((inv) =>
       inv.id === id
         ? {
@@ -585,6 +692,154 @@ export const financeService = {
         : inv
     );
     setLocal(STORAGE_KEYS.INVOICES, updatedInvoices);
+  },
+
+  // ─── Ticket Sparepart Management (Dashboard Teknisi & Service Billing) ───
+  getTicketSpareparts(order: any): TicketSparepart[] {
+    if (!order) return [];
+    const checks = (order.unit_checks || {}) as Record<string, any>;
+    return (checks._used_spareparts || []) as TicketSparepart[];
+  },
+
+  async addSparepartToTicket(
+    order: { id: string; ticket_number: string; unit_checks?: any },
+    product: FinanceProduct,
+    quantity: number,
+    userId?: string
+  ): Promise<TicketSparepart[]> {
+    if (quantity <= 0) throw new Error("Jumlah kuantitas harus minimal 1");
+    if (product.stock < quantity) {
+      throw new Error(`Stok tidak mencukupi. Sisa stok tersedia: ${product.stock} ${product.unit}`);
+    }
+
+    // 1. Deduct stock from inventory
+    await this.adjustStock(
+      product.id,
+      -quantity,
+      "out",
+      `Terpakai oleh teknisi di Tiket Servis #${order.ticket_number} (${quantity} ${product.name})`
+    );
+
+    // 2. Prepare sparepart record
+    const newPart: TicketSparepart = {
+      id: `tsp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      product_id: product.id,
+      product_name: product.name,
+      sku: product.sku || null,
+      purchase_price: product.purchase_price,
+      selling_price: product.selling_price,
+      quantity,
+      added_at: new Date().toISOString(),
+      added_by: userId,
+    };
+
+    const currentChecks = (order.unit_checks || {}) as Record<string, any>;
+    const currentParts = (currentChecks._used_spareparts || []) as TicketSparepart[];
+    const updatedParts = [...currentParts, newPart];
+
+    const updatedChecks = {
+      ...currentChecks,
+      _used_spareparts: updatedParts,
+    };
+
+    // 3. Persist to service_orders
+    try {
+      await supabase
+        .from("service_orders")
+        .update({ unit_checks: updatedChecks as any })
+        .eq("id", order.id);
+    } catch (err) {
+      console.warn("Failed to persist sparepart to service_orders in Supabase:", err);
+    }
+
+    return updatedParts;
+  },
+
+  async removeSparepartFromTicket(
+    order: { id: string; ticket_number: string; unit_checks?: any },
+    sparepartId: string
+  ): Promise<TicketSparepart[]> {
+    const currentChecks = (order.unit_checks || {}) as Record<string, any>;
+    const currentParts = (currentChecks._used_spareparts || []) as TicketSparepart[];
+    const partToRemove = currentParts.find((p) => p.id === sparepartId);
+
+    if (!partToRemove) return currentParts;
+
+    // 1. Restore stock to inventory
+    await this.adjustStock(
+      partToRemove.product_id,
+      partToRemove.quantity,
+      "in",
+      `Dibatalkan/dihapus dari Tiket Servis #${order.ticket_number} (${partToRemove.quantity} ${partToRemove.product_name})`
+    );
+
+    // 2. Remove from ticket
+    const updatedParts = currentParts.filter((p) => p.id !== sparepartId);
+    const updatedChecks = {
+      ...currentChecks,
+      _used_spareparts: updatedParts,
+    };
+
+    // 3. Persist to service_orders
+    try {
+      await supabase
+        .from("service_orders")
+        .update({ unit_checks: updatedChecks as any })
+        .eq("id", order.id);
+    } catch (err) {
+      console.warn("Failed to update spareparts on service_orders:", err);
+    }
+
+    return updatedParts;
+  },
+
+  async saveTicketServiceAction(
+    order: { id: string; unit_checks?: any },
+    actionNote: string,
+    laborCost: number
+  ): Promise<void> {
+    const currentChecks = (order.unit_checks || {}) as Record<string, any>;
+    const updatedChecks = {
+      ...currentChecks,
+      _technician_action_note: actionNote.trim(),
+      _service_labor_cost: laborCost >= 0 ? laborCost : 0,
+    };
+
+    try {
+      await supabase
+        .from("service_orders")
+        .update({
+          unit_checks: updatedChecks as any,
+          estimated_cost: laborCost >= 0 ? laborCost : 0,
+        })
+        .eq("id", order.id);
+    } catch (err) {
+      console.warn("Failed to save service action note on ticket:", err);
+    }
+  },
+
+  async getUnbilledServiceOrders(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from("service_orders")
+        .select("*")
+        .in("status", ["Selesai", "Siap diAmbil", "Close"])
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+      if (!data) return [];
+
+      // Filter only unbilled orders
+      const unbilled = data.filter((order) => {
+        const checks = (order.unit_checks || {}) as Record<string, any>;
+        return checks._invoice_status !== "invoiced";
+      });
+
+      return unbilled;
+    } catch (err) {
+      console.warn("Failed to fetch unbilled service orders from Supabase:", err);
+      return [];
+    }
   },
 
   // ─── Expenses ───

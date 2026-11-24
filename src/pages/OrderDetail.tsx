@@ -51,7 +51,10 @@ import {
   Link2,
   ExternalLink,
   UserCheck,
+  Wrench,
+  Boxes,
 } from "lucide-react";
+import { financeService, FinanceProduct, TicketSparepart } from "@/services/financeService";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { openDirectWhatsApp } from "@/lib/whatsapp";
@@ -275,6 +278,106 @@ export default function OrderDetailPage() {
   const [reassignTechId, setReassignTechId] = useState<string>("");
   const [technicians, setTechnicians] = useState<any[]>([]);
 
+  // Ticket Spareparts & Service Action Note State (Dashboard Teknisi & Finance Sync)
+  const [ticketSpareparts, setTicketSpareparts] = useState<TicketSparepart[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<FinanceProduct[]>([]);
+  const [addPartModalOpen, setAddPartModalOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [partQty, setPartQty] = useState<number>(1);
+  const [addingPartLoading, setAddingPartLoading] = useState(false);
+  const [techActionNote, setTechActionNote] = useState<string>("");
+  const [techLaborCost, setTechLaborCost] = useState<number>(0);
+  const [savingActionLoading, setSavingActionLoading] = useState(false);
+
+  const handleOpenAddPart = async () => {
+    try {
+      const prods = await financeService.getProducts();
+      const inStock = prods.filter((p) => p.stock > 0);
+      setAvailableProducts(inStock);
+      if (inStock.length > 0) setSelectedProductId(inStock[0].id);
+      setPartQty(1);
+      setAddPartModalOpen(true);
+    } catch (err: any) {
+      toast.error("Gagal memuat daftar stok barang");
+    }
+  };
+
+  const handleAddSparepart = async () => {
+    if (!selectedProductId || !order) return;
+    const prod = availableProducts.find((p) => p.id === selectedProductId);
+    if (!prod) {
+      toast.error("Barang tidak ditemukan");
+      return;
+    }
+    if (partQty <= 0) {
+      toast.error("Kuantitas harus minimal 1");
+      return;
+    }
+    if (prod.stock < partQty) {
+      toast.error(`Sisa stok tersedia hanya ${prod.stock} ${prod.unit}`);
+      return;
+    }
+
+    setAddingPartLoading(true);
+    try {
+      const updated = await financeService.addSparepartToTicket(order, prod, partQty, user?.id);
+      setTicketSpareparts(updated);
+      setOrder((prev: any) => ({
+        ...prev,
+        unit_checks: {
+          ...(prev?.unit_checks || {}),
+          _used_spareparts: updated,
+        },
+      }));
+      toast.success(`Sparepart "${prod.name}" berhasil ditambahkan & stok dipotong (-${partQty})`);
+      setAddPartModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menambahkan sparepart");
+    } finally {
+      setAddingPartLoading(false);
+    }
+  };
+
+  const handleRemoveSparepart = async (sparepartId: string) => {
+    if (!order) return;
+    try {
+      const updated = await financeService.removeSparepartFromTicket(order, sparepartId);
+      setTicketSpareparts(updated);
+      setOrder((prev: any) => ({
+        ...prev,
+        unit_checks: {
+          ...(prev?.unit_checks || {}),
+          _used_spareparts: updated,
+        },
+      }));
+      toast.success("Sparepart dihapus dan stok barang dikembalikan");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menghapus sparepart");
+    }
+  };
+
+  const handleSaveActionNote = async () => {
+    if (!order) return;
+    setSavingActionLoading(true);
+    try {
+      await financeService.saveTicketServiceAction(order, techActionNote, techLaborCost);
+      setOrder((prev: any) => ({
+        ...prev,
+        unit_checks: {
+          ...(prev?.unit_checks || {}),
+          _technician_action_note: techActionNote,
+          _service_labor_cost: techLaborCost,
+        },
+        estimated_cost: techLaborCost,
+      }));
+      toast.success("Keterangan tindakan & estimasi jasa berhasil disimpan");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menyimpan keterangan tindakan");
+    } finally {
+      setSavingActionLoading(false);
+    }
+  };
+
   // Linked warranty tickets (Integrasi Garansi Toko)
   const [linkedOriginalTicket, setLinkedOriginalTicket] = useState<any | null>(null);
   const [linkedWarrantyTickets, setLinkedWarrantyTickets] = useState<any[]>([]);
@@ -403,6 +506,12 @@ export default function OrderDetailPage() {
       if (orderRes.data) {
         setOrder(orderRes.data);
         setDelayReason((orderRes.data as any).update_delay_reason || "");
+
+        // Sync ticket spareparts & technician action notes
+        const checks = (orderRes.data.unit_checks || {}) as Record<string, any>;
+        setTicketSpareparts(financeService.getTicketSpareparts(orderRes.data));
+        setTechActionNote(checks._technician_action_note || orderRes.data.notes || "");
+        setTechLaborCost(checks._service_labor_cost || orderRes.data.estimated_cost || 0);
 
         const identityIds = [orderRes.data.created_by, orderRes.data.assigned_technician].filter(Boolean);
         const { profileMap: orderProfileMap, roleMap: orderRoleMap } = await fetchStaffIdentities(identityIds);
@@ -2208,6 +2317,131 @@ export default function OrderDetailPage() {
           </Card>
         )}
 
+        {/* Pemakaian Sparepart & Estimasi Jasa (Opsional - Dashboard Teknisi & Admin) */}
+        <Card className="border-border/80 shadow-sm print:hidden">
+          <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Wrench className="h-4 w-4 text-emerald-500" />
+                <span>Pemakaian Sparepart & Estimasi Jasa</span>
+                <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+                  Opsional
+                </Badge>
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Catat komponen/sparepart yang diganti pada unit ini. Jika servis berupa jasa murni (reball, cleaning, jumper, flash BIOS), bagian ini boleh dilewati.
+              </p>
+            </div>
+            {canUpdateStatus && order.status !== "Close" && order.status !== "Cancelled" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleOpenAddPart}
+                className="text-xs h-8 gap-1.5 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10 shrink-0 self-start sm:self-auto"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Pilih Sparepart</span>
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4 pt-1">
+            {/* List of spareparts */}
+            {ticketSpareparts.length === 0 ? (
+              <div className="p-3 rounded-lg border border-dashed border-border/80 bg-muted/20 text-xs text-muted-foreground text-center">
+                Belum ada sparepart yang digunakan (Servis Jasa Murni). Stok komponen inventaris aman tidak terpotong.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase text-muted-foreground tracking-wider flex items-center justify-between">
+                  <span>Daftar Sparepart / Komponen Terpakai</span>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {ticketSpareparts.length} Komponen
+                  </Badge>
+                </div>
+                <div className="divide-y divide-border/60 border rounded-lg bg-card/50 overflow-hidden">
+                  {ticketSpareparts.map((p) => (
+                    <div key={p.id} className="p-3 flex items-center justify-between gap-3 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground truncate">{p.product_name}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
+                          {p.sku && <span className="font-mono">SKU: {p.sku}</span>}
+                          <span>Kuantitas: <strong className="text-foreground">{p.quantity} item</strong></span>
+                          <span>Harga: Rp {p.selling_price.toLocaleString("id-ID")}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-bold text-emerald-400">
+                          Rp {(p.selling_price * p.quantity).toLocaleString("id-ID")}
+                        </span>
+                        {canUpdateStatus && order.status !== "Close" && order.status !== "Cancelled" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRemoveSparepart(p.id)}
+                            className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                            title="Hapus dari tiket & kembalikan stok"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground italic">
+                  * Stok barang di atas otomatis terpotong saat disimpan di tiket ini, dan tidak akan dipotong ulang saat nota kasir dibuat oleh Finance.
+                </p>
+              </div>
+            )}
+
+            {/* Tindakan Perbaikan & Estimasi Jasa */}
+            <div className="p-3.5 rounded-lg bg-muted/40 border space-y-2.5">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Keterangan Tindakan Perbaikan (Opsional)</Label>
+                <Textarea
+                  placeholder="Contoh: Reball chipset, perbaikan jalur power 3.3V, atau ganti thermal paste"
+                  value={techActionNote}
+                  onChange={(e) => setTechActionNote(e.target.value)}
+                  disabled={!canUpdateStatus || order.status === "Close"}
+                  className="text-xs min-h-[50px]"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-semibold whitespace-nowrap">Estimasi Jasa (Rp):</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={techLaborCost || ""}
+                    onChange={(e) => setTechLaborCost(Number(e.target.value) || 0)}
+                    disabled={!canUpdateStatus || order.status === "Close"}
+                    placeholder="0"
+                    className="h-8 text-xs w-36 font-bold"
+                  />
+                  {techLaborCost > 0 && (
+                    <span className="text-xs text-muted-foreground font-mono">
+                      = Rp {techLaborCost.toLocaleString("id-ID")}
+                    </span>
+                  )}
+                </div>
+
+                {canUpdateStatus && order.status !== "Close" && (
+                  <Button
+                    size="sm"
+                    onClick={handleSaveActionNote}
+                    disabled={savingActionLoading}
+                    className="text-xs h-8 gap-1.5 self-end sm:self-auto gradient-primary"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    <span>{savingActionLoading ? "Menyimpan..." : "Simpan Tindakan & Jasa"}</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Warranty Info */}
         {typeof (order as any).warranty_duration === "number" && order.status === "Close" && (
           <Card className="border-primary/30 print:hidden">
@@ -2802,6 +3036,96 @@ export default function OrderDetailPage() {
             </Button>
             <Button onClick={confirmOwnerRollback} className="gradient-primary">
               Konfirmasi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Pilih Sparepart dari Stok Inventaris (Dashboard Teknisi & Admin) */}
+      <Dialog open={addPartModalOpen} onOpenChange={setAddPartModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-emerald-500" />
+              <span>Pilih Sparepart dari Stok</span>
+            </DialogTitle>
+            <DialogDescription>
+              Pilih komponen/barang yang diganti. Stok inventaris akan otomatis berkurang saat disimpan.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            {availableProducts.length === 0 ? (
+              <div className="p-4 rounded-lg bg-muted text-center text-muted-foreground">
+                Tidak ada stok barang/sparepart yang tersedia di inventaris.
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Pilih Barang / Komponen</Label>
+                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Pilih barang..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProducts.map((p) => (
+                        <SelectItem key={p.id} value={p.id} className="text-xs">
+                          {p.name} (Sisa: {p.stock} {p.unit}) — Rp {p.selling_price.toLocaleString("id-ID")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Jumlah / Kuantitas</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={partQty}
+                    onChange={(e) => setPartQty(Math.max(1, Number(e.target.value) || 1))}
+                    className="h-9 text-xs font-bold w-28"
+                  />
+                </div>
+
+                {selectedProductId && (
+                  <div className="p-3 rounded-lg bg-muted/60 border text-[11px] space-y-1">
+                    {(() => {
+                      const p = availableProducts.find((item) => item.id === selectedProductId);
+                      if (!p) return null;
+                      return (
+                        <>
+                          <p className="font-semibold text-foreground">{p.name}</p>
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>Kategori: {p.category}</span>
+                            <span>Sisa Stok: <strong className="text-foreground">{p.stock} {p.unit}</strong></span>
+                          </div>
+                          <div className="flex justify-between pt-1 border-t border-border/40 font-semibold">
+                            <span>Total Harga:</span>
+                            <span className="text-emerald-400 font-bold">
+                              Rp {(p.selling_price * partQty).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" size="sm" onClick={() => setAddPartModalOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleAddSparepart}
+              disabled={addingPartLoading || availableProducts.length === 0}
+              className="gradient-primary"
+            >
+              {addingPartLoading ? "Menyimpan & Memotong Stok..." : "Gunakan Sparepart"}
             </Button>
           </DialogFooter>
         </DialogContent>

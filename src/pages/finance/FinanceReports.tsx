@@ -157,8 +157,10 @@ export default function FinanceReports() {
         date: inv.date || inv.created_at,
         type: "in",
         ref: inv.invoice_number,
-        description: `Penjualan Kasir (${inv.customer_name})`,
-        category: "Penjualan Barang / Nota",
+        description: inv.ticket_number
+          ? `Servis #${inv.ticket_number} - ${inv.device_info || "Perangkat"} (${inv.customer_name})`
+          : `Penjualan Kasir (${inv.customer_name})`,
+        category: inv.ticket_number ? "Jasa Servis & Sparepart" : "Penjualan Barang / Nota",
         amount: inv.grand_total,
       });
     });

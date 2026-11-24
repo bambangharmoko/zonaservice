@@ -730,6 +730,8 @@ export default function FinanceInventory() {
                                   ? "border-emerald-500/40 text-emerald-400"
                                   : log.type === "in"
                                   ? "border-emerald-500/40 text-emerald-400"
+                                  : log.type === "out"
+                                  ? "border-purple-500/40 text-purple-400"
                                   : "border-amber-500/40 text-amber-400"
                               }`}
                             >
@@ -739,6 +741,8 @@ export default function FinanceInventory() {
                                 ? "Retur Void"
                                 : log.type === "in"
                                 ? "Kulakan"
+                                : log.type === "out"
+                                ? "Servis / Terpakai"
                                 : "Penyesuaian"}
                             </Badge>
                           </td>
