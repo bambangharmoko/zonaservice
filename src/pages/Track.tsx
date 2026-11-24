@@ -8,7 +8,25 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowLeft, Phone, Mail, Monitor, RefreshCw, Printer, CheckCircle, StickyNote } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Phone,
+  Mail,
+  Monitor,
+  RefreshCw,
+  Printer,
+  CheckCircle,
+  StickyNote,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldX,
+  Clock,
+  Calendar,
+} from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
 import { QRCodeSVG } from "qrcode.react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -357,7 +375,7 @@ export default function TrackPage() {
             <li><strong>Batas Waktu Pengambilan Unit:</strong> Unit yang telah selesai diperbaiki atau dibatalkan, namun tidak diambil dalam kurun waktu <strong>3 (tiga) bulan</strong> sejak pelanggan dihubungi, maka segala bentuk kerusakan, kehilangan, atau penyusutan nilai barang sudah berada di luar tanggung jawab kami. Pihak toko berhak mengelola unit tersebut untuk menutupi biaya administrasi dan penyimpanan.</li>
             <li><strong>Risiko Unit Mati Total:</strong> Untuk unit yang diserahkan dalam <strong>Kondisi apa pun</strong>, apabila sebelumnya pelanggan telah diinformasikan oleh teknisi bahwa terdapat risiko unit menjadi Mati Total selama proses pembongkaran, pengecekan, atau perbaikan, maka kami tidak bertanggung jawab jika hal tersebut benar-benar terjadi. Tindakan perbaikan komponen elektronik memiliki risiko teknis bawaan yang terkadang di luar kendali.</li>
             <li><strong>Pengecekan Gratis (<em>Free Diagnostic</em>):</strong> Kami tidak memungut biaya pengecekan atau diagnosa. Apabila setelah dilakukan pengecekan pelanggan memutuskan untuk membatalkan perbaikan (misalnya karena estimasi biaya tidak disetujui), unit akan dirakit kembali dan dikembalikan <strong>tanpa dikenakan biaya apa pun</strong>.</li>
-            <li><strong>Garansi Perbaikan:</strong> Garansi servis berlaku selama <strong>30 Hari</strong> terhitung sejak unit selesai diperbaiki atau diambil. Garansi ini <strong>hanya berlaku</strong> untuk jenis keluhan dan pergantian suku cadang yang sama.</li>
+            <li><strong>Garansi Perbaikan:</strong> Garansi servis berlaku selama <strong>{order.warranty_duration !== undefined && order.warranty_duration !== null ? (order.warranty_duration > 0 ? `${order.warranty_duration} Hari` : "Tanpa Garansi") : "30 Hari"}</strong> terhitung sejak unit selesai diperbaiki atau diambil. Garansi ini <strong>hanya berlaku</strong> untuk jenis keluhan dan pergantian suku cadang yang sama.</li>
             <li><strong>Klaim & Batalnya Garansi (Void):</strong> Garansi otomatis hangus atau tidak berlaku apabila unit kembali dengan keluhan/kerusakan pada komponen yang <strong>berbeda</strong> dari riwayat perbaikan sebelumnya. Garansi juga batal jika ditemukan indikasi kelalaian pemakaian (<em>human error</em>), seperti cacat fisik (jatuh, terbentur, pecah), atau indikasi unit terkena cairan setelah perbaikan selesai.</li>
             <li><strong>Keamanan Unit & Kejadian Tak Terduga:</strong> Kami berkomitmen penuh untuk menjaga keamanan unit Anda selama berada di bengkel kami. Namun, apabila terjadi kejadian luar biasa di luar kendali kami (<em>force majeure</em>) seperti bencana alam, kebakaran, atau musibah tak terduga lainnya, maka segala bentuk penyelesaian akan dibicarakan secara musyawarah dan kekeluargaan demi menemukan solusi terbaik bagi kedua belah pihak.</li>
           </ol>
@@ -411,6 +429,188 @@ export default function TrackPage() {
 
       <div className="max-w-2xl mx-auto p-4 space-y-4 print:hidden">
         {!isOnline && <div className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">Mode offline. Status akan diperbarui saat koneksi kembali.</div>}
+
+        {/* Kartu Status Masa Garansi (Transparan & Real-Time) */}
+        {(() => {
+          const uChecks = (order.unit_checks || {}) as Record<string, any>;
+          const rawDuration = typeof order.warranty_duration === "number"
+            ? order.warranty_duration
+            : (typeof uChecks._warranty_duration === "number" ? uChecks._warranty_duration : null);
+          const rawExpiry = order.warranty_expiry || uChecks._warranty_expiry || null;
+          const rawStartDate = uChecks._warranty_start_date || null;
+          const rawNotes = order.warranty_notes || uChecks._warranty_notes || null;
+
+          // 1. Tiket dibatalkan
+          if (order.status === "Cancelled" || order.status === "Cancel by Customer" || order.status === "Cancel by Zona Service") {
+            return (
+              <Card className="border-border">
+                <CardContent className="p-3.5 flex items-center gap-3 text-xs">
+                  <ShieldAlert className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="font-semibold text-foreground">Status Garansi: Tidak Berlaku</p>
+                    <p className="text-muted-foreground">
+                      Pengerjaan unit pada tiket servis ini dibatalkan, sehingga tidak ada ketentuan garansi yang berlaku.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          }
+
+          // 2. Tiket sudah selesai & nota lunas dibuat oleh Finance (Status: "Close")
+          if (order.status === "Close") {
+            if (rawDuration === 0) {
+              return (
+                <Card className="border-border/60">
+                  <CardContent className="p-3.5 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <ShieldAlert className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="font-semibold text-foreground">Layanan Tanpa Garansi</p>
+                        <p className="text-muted-foreground">
+                          Layanan atau perbaikan pada tiket ini diselesaikan tanpa masa garansi.
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-muted-foreground border-border text-[10px]">
+                      0 Hari
+                    </Badge>
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            if (rawDuration && rawDuration > 0) {
+              const now = new Date();
+              const expiryDate = rawExpiry ? new Date(rawExpiry) : null;
+              const diffTime = expiryDate ? expiryDate.getTime() - now.getTime() : 0;
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              const isExpired = !expiryDate || diffDays <= 0;
+
+              if (!isExpired) {
+                return (
+                  <Card className="border-emerald-500/40 bg-emerald-500/5 shadow-sm">
+                    <CardHeader className="p-3.5 pb-2 flex flex-row items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                        <CardTitle className="text-sm sm:text-base text-emerald-600 dark:text-emerald-400 font-bold">
+                          Garansi Servis Aktif
+                        </CardTitle>
+                      </div>
+                      <Badge className="bg-emerald-600 text-white font-bold text-xs px-2.5 py-0.5">
+                        Sisa {diffDays} Hari
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="p-3.5 pt-1 space-y-2 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-emerald-500/20">
+                        <span className="text-muted-foreground">
+                          Masa Garansi: <strong className="text-foreground">{rawDuration} Hari</strong>
+                        </span>
+                        {expiryDate && (
+                          <span className="text-foreground font-medium flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5 text-emerald-500" />
+                            Berlaku s/d: <strong>{format(expiryDate, "dd MMMM yyyy", { locale: idLocale })}</strong>
+                          </span>
+                        )}
+                      </div>
+                      {rawStartDate && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Mulai aktif sejak nota diterbitkan pada{" "}
+                          {format(new Date(rawStartDate), "dd MMM yyyy, HH:mm", { locale: idLocale })}
+                        </p>
+                      )}
+                      {rawNotes && (
+                        <p className="text-[11px] text-foreground bg-muted/60 p-2 rounded border border-border/40">
+                          <strong>Ketentuan:</strong> {rawNotes}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              } else {
+                return (
+                  <Card className="border-rose-500/40 bg-rose-500/5">
+                    <CardHeader className="p-3.5 pb-2 flex flex-row items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldX className="h-5 w-5 text-rose-500" />
+                        <CardTitle className="text-sm sm:text-base text-rose-600 dark:text-rose-400 font-bold">
+                          Masa Garansi Telah Berakhir
+                        </CardTitle>
+                      </div>
+                      <Badge variant="outline" className="text-rose-500 border-rose-500/40 text-[10px]">
+                        Kadaluarsa
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="p-3.5 pt-1 space-y-1 text-xs">
+                      <p className="text-muted-foreground">
+                        Masa garansi servis selama <strong>{rawDuration} Hari</strong> telah selesai pada{" "}
+                        {expiryDate ? format(expiryDate, "dd MMMM yyyy", { locale: idLocale }) : "-"}.
+                      </p>
+                      {rawNotes && (
+                        <p className="text-[11px] text-muted-foreground italic">
+                          Ketentuan sebelumnya: {rawNotes}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              }
+            }
+          }
+
+          // 3. Sebelum nota dibuat (status masih pengerjaan atau baru "Siap diAmbil")
+          if (rawDuration !== null && rawDuration !== undefined) {
+            if (rawDuration > 0) {
+              return (
+                <Card className="border-amber-500/40 bg-amber-500/5">
+                  <CardHeader className="p-3.5 pb-2 flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-amber-500" />
+                      <CardTitle className="text-sm sm:text-base text-amber-600 dark:text-amber-400 font-bold">
+                        Garansi Servis: {rawDuration} Hari
+                      </CardTitle>
+                    </div>
+                    <Badge variant="outline" className="text-amber-500 border-amber-500/40 text-[10px]">
+                      Menunggu Pengambilan
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="p-3.5 pt-1 space-y-1.5 text-xs">
+                    <p className="text-foreground leading-relaxed">
+                      ⏳ <strong>Status Garansi:</strong> Masa garansi akan <strong>aktif otomatis</strong> setelah pengambilan unit & penerbitan nota pembayaran di kasir.
+                    </p>
+                    {rawNotes && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Ketentuan: {rawNotes}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            } else {
+              return (
+                <Card className="border-border">
+                  <CardContent className="p-3.5 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <ShieldAlert className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="font-semibold text-foreground">Layanan Tanpa Garansi</p>
+                        <p className="text-muted-foreground">
+                          Layanan pada tiket ini tidak memiliki masa garansi perbaikan.
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-muted-foreground border-border text-[10px]">
+                      0 Hari
+                    </Badge>
+                  </CardContent>
+                </Card>
+              );
+            }
+          }
+
+          return null;
+        })()}
+
         {/* Detail Unit */}
         <Card>
           <CardHeader className="pb-3">
@@ -442,32 +642,39 @@ export default function TrackPage() {
                 <span className="text-muted-foreground">Tanggal Masuk</span>
                 <p className="font-medium">{new Date(order.created_at).toLocaleDateString("id-ID")}</p>
               </div>
-              {(order.warranty_duration || order.warranty_notes || order.warranty_expiry) ? (
-                <div>
-                  <span className="text-muted-foreground">Masa Garansi</span>
-                  <p className="font-medium">
-                    {(() => {
-                      if (order.warranty_expiry) {
-                        const now = new Date();
-                        const expiryDate = new Date(order.warranty_expiry);
-                        const diffTime = expiryDate.getTime() - now.getTime();
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              {(() => {
+                const uChecks = (order.unit_checks || {}) as Record<string, any>;
+                const rawDuration = typeof order.warranty_duration === "number"
+                  ? order.warranty_duration
+                  : (typeof uChecks._warranty_duration === "number" ? uChecks._warranty_duration : null);
+                const rawExpiry = order.warranty_expiry || uChecks._warranty_expiry || null;
 
-                        if (diffDays > 0) {
-                          return `Aktif - Sisa ${diffDays} Hari${order.warranty_notes ? ` (${order.warranty_notes})` : ""}`;
-                        } else {
-                          return <span className="text-destructive">Tidak Aktif{order.warranty_notes ? ` (${order.warranty_notes})` : ""}</span>;
+                if (rawDuration === null && !rawExpiry) return null;
+
+                return (
+                  <div>
+                    <span className="text-muted-foreground">Masa Garansi</span>
+                    <p className="font-medium">
+                      {(() => {
+                        if (rawDuration === 0) return "Tanpa Garansi";
+                        if (order.status === "Close" && rawExpiry) {
+                          const now = new Date();
+                          const expiryDate = new Date(rawExpiry);
+                          const diffDays = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                          if (diffDays > 0) {
+                            return `Aktif — Sisa ${diffDays} Hari`;
+                          }
+                          return <span className="text-destructive font-semibold">Telah Berakhir</span>;
                         }
-                      }
-
-                      return [
-                        order.warranty_duration ? `${order.warranty_duration} ${order.warranty_unit || 'hari'}` : "",
-                        order.warranty_notes ? `(${order.warranty_notes})` : ""
-                      ].filter(Boolean).join(" ") || "Aktif";
-                    })()}
-                  </p>
-                </div>
-              ) : null}
+                        if (rawDuration && rawDuration > 0) {
+                          return `${rawDuration} Hari (Aktif saat nota dibuat)`;
+                        }
+                        return "Tanpa Garansi";
+                      })()}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
             {order.notes && (
               <div>

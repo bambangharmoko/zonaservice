@@ -61,6 +61,10 @@ export interface FinanceInvoice {
   date: string;
   customer_name: string;
   customer_phone?: string | null;
+  warranty_duration?: number | null;
+  warranty_start_date?: string | null;
+  warranty_end_date?: string | null;
+  warranty_notes?: string | null;
   subtotal: number;
   discount_type: "fixed" | "percent";
   discount_value: number;
@@ -416,6 +420,8 @@ export const financeService = {
     ticket_id?: string | null;
     ticket_number?: string | null;
     device_info?: string | null;
+    warranty_duration?: number | null;
+    warranty_notes?: string | null;
     items: {
       product_id?: string;
       product_name: string;
@@ -458,6 +464,8 @@ export const financeService = {
       ticket_id: payload.ticket_id || null,
       ticket_number: payload.ticket_number || null,
       device_info: payload.device_info || null,
+      warranty_duration: payload.warranty_duration ?? null,
+      warranty_notes: payload.warranty_notes || null,
       date: now.toISOString(),
       customer_name: payload.customer_name?.trim() || "Umum",
       customer_phone: payload.customer_phone?.trim() || null,
@@ -549,34 +557,78 @@ export const financeService = {
       }
     }
 
-    // 5. Anti-Double Billing:
-    // If invoice created from service ticket, mark ticket as invoiced
+    // 5. Anti-Double Billing, Warranty Activation & Auto-Close:
+    // If invoice created from service ticket, activate warranty countdown, auto-close ticket to 'Close', and update log
     if (payload.ticket_id) {
       try {
         const { data: orderData } = await supabase
           .from("service_orders")
-          .select("id, unit_checks")
+          .select("id, ticket_number, status, unit_checks, warranty_duration, warranty_notes")
           .eq("id", payload.ticket_id)
           .single();
 
         const currentChecks = (orderData?.unit_checks || {}) as Record<string, any>;
+        const warrantyDuration = payload.warranty_duration !== undefined && payload.warranty_duration !== null
+          ? payload.warranty_duration
+          : (orderData?.warranty_duration ?? currentChecks._warranty_duration ?? 0);
+        const warrantyNotes = payload.warranty_notes !== undefined && payload.warranty_notes !== null
+          ? payload.warranty_notes
+          : (orderData?.warranty_notes ?? currentChecks._warranty_notes ?? null);
+
+        let warrantyExpiry: string | null = null;
+        let warrantyStartDate: string | null = null;
+
+        if (warrantyDuration && warrantyDuration > 0) {
+          warrantyStartDate = now.toISOString();
+          const exp = new Date(now.getTime() + warrantyDuration * 24 * 60 * 60 * 1000);
+          warrantyExpiry = exp.toISOString();
+        }
+
+        invoiceRecord.warranty_duration = warrantyDuration;
+        invoiceRecord.warranty_start_date = warrantyStartDate;
+        invoiceRecord.warranty_end_date = warrantyExpiry;
+        invoiceRecord.warranty_notes = warrantyNotes;
+
         const updatedChecks = {
           ...currentChecks,
           _invoice_status: "invoiced",
           _invoice_id: invoiceRecord.id,
           _invoice_number: invoiceRecord.invoice_number,
           _invoiced_at: now.toISOString(),
+          _warranty_duration: warrantyDuration || 0,
+          _warranty_unit: "hari",
+          _warranty_start_date: warrantyStartDate,
+          _warranty_expiry: warrantyExpiry,
+          _warranty_notes: warrantyNotes,
         };
 
+        // Otomatis ubah status tiket ke "Close" dan simpan masa garansi
         await supabase
           .from("service_orders")
           .update({
+            status: "Close" as any,
             unit_checks: updatedChecks as any,
             final_cost: grand_total,
+            warranty_duration: warrantyDuration || 0,
+            warranty_unit: "hari",
+            warranty_notes: warrantyNotes,
+            warranty_expiry: warrantyExpiry,
           })
           .eq("id", payload.ticket_id);
+
+        // Catat riwayat status di service_updates
+        const expiryFormatted = warrantyExpiry ? new Date(warrantyExpiry).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+        await supabase.from("service_updates").insert({
+          order_id: payload.ticket_id,
+          status: "Close" as any,
+          description: `Nota lunas diterbitkan oleh Finance (No. Nota: ${invoiceRecord.invoice_number}). Unit telah diambil & status ditutup. ${
+            warrantyDuration > 0
+              ? `Masa garansi ${warrantyDuration} hari aktif mulai sekarang s/d ${expiryFormatted}.`
+              : "Layanan ini Tanpa Garansi."
+          }`,
+        });
       } catch (err) {
-        console.warn("Failed to mark service order as invoiced in Supabase:", err);
+        console.warn("Failed to mark service order as invoiced & Close in Supabase:", err);
       }
 
       // Also mark local ticket cache
@@ -627,7 +679,7 @@ export const financeService = {
       }
     }
 
-    // 2. If invoice was from a ticket, restore ticket status back to "unbilled"
+    // 2. If invoice was from a ticket, restore ticket status back to "Siap diAmbil" and reset warranty countdown
     if (invoice.ticket_id) {
       try {
         const { data: orderData } = await supabase
@@ -643,12 +695,24 @@ export const financeService = {
           _invoice_id: null,
           _invoice_number: null,
           _voided_at: now,
+          _warranty_start_date: null,
+          _warranty_expiry: null,
         };
 
         await supabase
           .from("service_orders")
-          .update({ unit_checks: updatedChecks as any })
+          .update({
+            status: "Siap diAmbil" as any,
+            unit_checks: updatedChecks as any,
+            warranty_expiry: null,
+          })
           .eq("id", invoice.ticket_id);
+
+        await supabase.from("service_updates").insert({
+          order_id: invoice.ticket_id,
+          status: "Siap diAmbil" as any,
+          description: `Nota pembayaran ${invoice.invoice_number} dibatalkan (Void) oleh Finance. Status tiket dikembalikan ke Siap diAmbil dan hitung mundur garansi di-reset.`,
+        });
       } catch (err) {
         console.warn("Failed to unmark ticket invoice status in Supabase:", err);
       }
@@ -818,12 +882,48 @@ export const financeService = {
     }
   },
 
+  async restoreCancelledTicketSpareparts(order: any): Promise<void> {
+    if (!order) return;
+    const checks = (order.unit_checks || {}) as Record<string, any>;
+    const parts = (checks._used_spareparts || []) as TicketSparepart[];
+    if (!parts || parts.length === 0) return;
+
+    for (const part of parts) {
+      if (part.product_id) {
+        try {
+          await this.adjustStock(
+            part.product_id,
+            part.quantity,
+            "in",
+            `Pengembalian stok pembatalan tiket servis #${order.ticket_number} (${part.quantity} ${part.product_name})`
+          );
+        } catch (err) {
+          console.warn(`Failed to return stock for cancelled ticket item ${part.product_id}:`, err);
+        }
+      }
+    }
+
+    const updatedChecks = {
+      ...checks,
+      _used_spareparts: [],
+    };
+
+    try {
+      await supabase
+        .from("service_orders")
+        .update({ unit_checks: updatedChecks as any })
+        .eq("id", order.id);
+    } catch {
+      // ignore
+    }
+  },
+
   async getUnbilledServiceOrders(): Promise<any[]> {
     try {
       const { data, error } = await supabase
         .from("service_orders")
         .select("*")
-        .in("status", ["Selesai", "Siap diAmbil", "Close"])
+        .in("status", ["Siap diAmbil", "Selesai"])
         .order("updated_at", { ascending: false });
 
       if (error) throw error;

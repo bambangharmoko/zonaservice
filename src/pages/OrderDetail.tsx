@@ -977,7 +977,45 @@ export default function OrderDetailPage() {
       setQcDialogOpen(true);
       return;
     }
-    if (ns === "Siap diAmbil" && order.status === "Selesai" && canManageInvoice) {
+    if (ns === "Siap diAmbil") {
+      const currentChecks = (order.unit_checks || {}) as Record<string, any>;
+      const parts = (currentChecks._used_spareparts || []) as TicketSparepart[];
+      const laborCost = Number(currentChecks._service_labor_cost ?? order.estimated_cost ?? 0);
+      const actionNote = currentChecks._technician_action_note || "";
+
+      // Auto-fill invoice items dari sparepart yang terpasang & estimasi jasa
+      const items: InvoiceItem[] = [];
+
+      parts.forEach((p) => {
+        items.push({
+          description: `${p.product_name}${p.quantity > 1 ? ` (x${p.quantity})` : ""}`,
+          amount: p.selling_price * p.quantity,
+        });
+      });
+
+      if (laborCost > 0 || actionNote) {
+        items.push({
+          description: actionNote ? `Jasa: ${actionNote}` : "Biaya Jasa Servis",
+          amount: laborCost,
+        });
+      } else if (items.length === 0) {
+        items.push({
+          description: "Biaya Jasa Servis",
+          amount: 0,
+        });
+      }
+
+      setInvoiceItems(items);
+
+      // Pre-fill masa garansi (default 30 hari atau yang sudah ada)
+      const prevDur = typeof (order as any).warranty_duration === "number"
+        ? (order as any).warranty_duration
+        : (currentChecks._warranty_duration ?? 30);
+
+      setWarrantyDuration(prevDur);
+      setWarrantyPreset([0, 7, 14, 30, 90].includes(prevDur) ? String(prevDur) : "kustom");
+      setWarrantyUnit("hari");
+      setWarrantyNotes((order as any).warranty_notes || currentChecks._warranty_notes || "");
       setInvoiceOpen(true);
       return;
     }
@@ -1357,6 +1395,14 @@ export default function OrderDetailPage() {
       toast.error("Alasan pembatalan wajib diisi!");
       return;
     }
+
+    // Kembalikan stok sparepart ke inventaris jika sempat terpotong di tiket
+    try {
+      await financeService.restoreCancelledTicketSpareparts(order);
+    } catch (err) {
+      console.warn("Gagal mengembalikan stok sparepart pembatalan:", err);
+    }
+
     await insertServiceUpdate({
       order_id: order.id,
       status: "Cancelled" as any,
@@ -1365,7 +1411,7 @@ export default function OrderDetailPage() {
       updated_by: user!.id,
     });
     await supabase.from("service_orders").update({ status: "Cancelled" }).eq("id", order.id);
-    toast.success("Pesanan dibatalkan");
+    toast.success("Pesanan dibatalkan & stok sparepart (jika ada) telah dikembalikan");
     setCancelDialogOpen(false);
     setCancelReason("");
     fetchData();
@@ -1419,23 +1465,41 @@ export default function OrderDetailPage() {
     }
     const total = validItems.reduce((sum, i) => sum + i.amount, 0);
 
+    const dur = warrantyDuration === null ? 0 : Math.max(0, warrantyDuration);
+
+    const currentChecks = (order.unit_checks || {}) as Record<string, any>;
+    const updatedChecks = {
+      ...currentChecks,
+      _warranty_duration: dur,
+      _warranty_unit: "hari",
+      _warranty_notes: warrantyNotes.trim() || null,
+      _warranty_expiry: null, // PRD: belum mulai dihitung mundur sebelum nota dibuat Finance!
+      _warranty_start_date: null,
+      _ready_at: new Date().toISOString(),
+    };
+
     await supabase
       .from("service_orders")
       .update({
         invoice_items: validItems as any,
         final_cost: total,
         status: "Siap diAmbil",
+        warranty_duration: dur,
+        warranty_unit: "hari",
+        warranty_notes: warrantyNotes.trim() || null,
+        warranty_expiry: null,
+        unit_checks: updatedChecks as any,
       })
       .eq("id", order.id);
 
     await insertServiceUpdate({
       order_id: order.id,
       status: "Siap diAmbil" as any,
-      description: `Invoice dibuat. Total: Rp ${total.toLocaleString("id-ID")}`,
+      description: `Rincian servis disimpan & unit Siap Diambil. Total: Rp ${total.toLocaleString("id-ID")} (Ketentuan Garansi: ${dur > 0 ? `${dur} Hari` : "Tanpa Garansi"}${warrantyNotes ? ` - ${warrantyNotes.trim()}` : ""})`,
       updated_by: user!.id,
     });
 
-    toast.success("Invoice disimpan, status diupdate ke Siap diAmbil");
+    toast.success("Rincian servis & ketentuan garansi disimpan. Status diupdate ke Siap Diambil.");
     setInvoiceOpen(false);
     fetchData();
   };
@@ -3245,70 +3309,180 @@ export default function OrderDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Invoice Dialog */}
+      {/* Konfirmasi Siap Diambil Dialog (Auto-fill Rincian Servis & Masa Garansi) */}
       <Dialog open={invoiceOpen} onOpenChange={setInvoiceOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Buat Invoice</DialogTitle>
-            <DialogDescription>Tambahkan item biaya servis.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-emerald-500" />
+              <span>Konfirmasi Siap Diambil & Rincian Servis</span>
+            </DialogTitle>
+            <DialogDescription>
+              Periksa rincian biaya servis, komponen yang diganti, dan tentukan masa garansi untuk pelanggan sebelum unit siap diambil.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            {invoiceItems.map((item, i) => (
-              <div key={i} className="flex gap-2 items-end">
-                <div className="flex-1 space-y-1">
-                  <Label className="text-xs">Deskripsi</Label>
-                  <Input
-                    value={item.description}
-                    onChange={(e) => {
-                      const items = [...invoiceItems];
-                      items[i].description = e.target.value;
-                      setInvoiceItems(items);
-                    }}
-                    placeholder="Item biaya"
-                  />
+
+          <div className="space-y-4 py-2 text-xs">
+            {/* Bagian 1: Rincian Biaya Servis & Sparepart */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-foreground">Rincian Komponen & Jasa Servis</Label>
+                <span className="text-[11px] text-muted-foreground">Otomatis terisi dari pengerjaan</span>
+              </div>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {invoiceItems.map((item, i) => (
+                  <div key={i} className="flex gap-2 items-end p-2 rounded-lg bg-muted/40 border border-border/60">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Deskripsi Item / Jasa</Label>
+                      <Input
+                        value={item.description}
+                        onChange={(e) => {
+                          const items = [...invoiceItems];
+                          items[i].description = e.target.value;
+                          setInvoiceItems(items);
+                        }}
+                        placeholder="Nama komponen / tindakan jasa..."
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="w-32 space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Biaya (Rp)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={item.amount ?? ""}
+                        onChange={(e) => {
+                          const items = [...invoiceItems];
+                          const value = e.target.value;
+                          items[i].amount = value === "" ? null : Math.max(0, Number(value));
+                          setInvoiceItems(items);
+                        }}
+                        className="h-8 text-xs font-bold"
+                        placeholder="0"
+                      />
+                    </div>
+                    {invoiceItems.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setInvoiceItems(invoiceItems.filter((_, j) => j !== i))}
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10 shrink-0"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInvoiceItems([...invoiceItems, { description: "", amount: null }])}
+                  className="h-7 text-xs gap-1"
+                >
+                  <Plus className="h-3 w-3" /> Tambah Item
+                </Button>
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground mr-2">Total Biaya:</span>
+                  <span className="font-extrabold text-sm text-emerald-500">
+                    Rp {invoiceItems.reduce((s, i) => s + (i.amount ?? 0), 0).toLocaleString("id-ID")}
+                  </span>
                 </div>
-                <div className="w-32 space-y-1">
-                  <Label className="text-xs">Nominal</Label>
+              </div>
+            </div>
+
+            {/* Bagian 2: Ketentuan Masa Garansi */}
+            <div className="space-y-2 pt-3 border-t border-border">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-foreground">Ketentuan Masa Garansi Servis</Label>
+                <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-500/40">
+                  {warrantyDuration && warrantyDuration > 0 ? `${warrantyDuration} Hari` : "Tanpa Garansi"}
+                </Badge>
+              </div>
+
+              {/* Chips Preset */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {[
+                  { label: "Tanpa Garansi", value: 0 },
+                  { label: "7 Hari", value: 7 },
+                  { label: "14 Hari", value: 14 },
+                  { label: "30 Hari", value: 30 },
+                  { label: "90 Hari", value: 90 },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setWarrantyDuration(opt.value);
+                      setWarrantyPreset(String(opt.value));
+                    }}
+                    className={`px-2 py-1.5 rounded-md text-[11px] font-medium border transition-all text-center ${
+                      warrantyDuration === opt.value && warrantyPreset !== "kustom"
+                        ? "bg-purple-600 text-white font-bold border-purple-600 shadow-sm"
+                        : "bg-muted/40 hover:bg-muted border-border text-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWarrantyPreset("kustom");
+                  }}
+                  className={`px-2 py-1.5 rounded-md text-[11px] font-medium border transition-all text-center ${
+                    warrantyPreset === "kustom"
+                      ? "bg-purple-600 text-white font-bold border-purple-600 shadow-sm"
+                      : "bg-muted/40 hover:bg-muted border-border text-foreground"
+                  }`}
+                >
+                  Kustom
+                </button>
+              </div>
+
+              {/* Input Kustom Hari */}
+              {warrantyPreset === "kustom" && (
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap">Jumlah Hari Garansi:</span>
                   <Input
                     type="number"
                     min={0}
-                    value={item.amount ?? ""}
-                    onChange={(e) => {
-                      const items = [...invoiceItems];
-                      const value = e.target.value;
-                      items[i].amount = value === "" ? null : Math.max(0, Number(value));
-                      setInvoiceItems(items);
-                    }}
+                    value={warrantyDuration ?? ""}
+                    onChange={(e) => setWarrantyDuration(Math.max(0, Number(e.target.value) || 0))}
+                    className="h-8 text-xs font-bold w-24"
+                    placeholder="0"
                   />
+                  <span className="text-[11px] text-muted-foreground">hari</span>
                 </div>
-                {invoiceItems.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setInvoiceItems(invoiceItems.filter((_, j) => j !== i))}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                )}
+              )}
+
+              {/* Catatan Garansi Opsional */}
+              <div className="space-y-1 pt-1">
+                <Label className="text-[11px] text-muted-foreground">Catatan Garansi (Opsional)</Label>
+                <Input
+                  value={warrantyNotes}
+                  onChange={(e) => setWarrantyNotes(e.target.value)}
+                  placeholder="Contoh: Garansi berlaku khusus pergantian IC Power & LCD"
+                  className="h-8 text-xs"
+                />
               </div>
-            ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setInvoiceItems([...invoiceItems, { description: "", amount: null }])}
-            >
-              <Plus className="h-3 w-3 mr-1" /> Tambah Item
-            </Button>
-            <div className="text-right font-bold text-lg">
-              Total: Rp {invoiceItems.reduce((s, i) => s + (i.amount ?? 0), 0).toLocaleString("id-ID")}
+
+              {/* Notice Garansi Belum Dihitung Mundur */}
+              <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-muted-foreground leading-relaxed">
+                ℹ️ <strong>Ketentuan Garansi:</strong> Durasi garansi baru tersimpan sebagai ketentuan tiket dan <strong>belum mulai dihitung mundur</strong>. Hitung mundur garansi akan otomatis aktif saat kasir Finance menerbitkan nota pembayaran.
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInvoiceOpen(false)}>
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" size="sm" onClick={() => setInvoiceOpen(false)}>
               Batal
             </Button>
-            <Button onClick={saveInvoice} className="gradient-primary">
-              Simpan Invoice
+            <Button onClick={saveInvoice} size="sm" className="gradient-primary font-semibold">
+              Simpan & Ubah Status ke Siap Diambil
             </Button>
           </DialogFooter>
         </DialogContent>

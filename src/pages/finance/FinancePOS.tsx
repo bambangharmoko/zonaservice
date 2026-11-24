@@ -84,6 +84,7 @@ export default function FinancePOS() {
 
   // Service Ticket Integration State
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
+  const [selectedTicketWarranty, setSelectedTicketWarranty] = useState<{ duration: number; notes: string }>({ duration: 0, notes: "" });
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [unbilledTickets, setUnbilledTickets] = useState<any[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
@@ -174,6 +175,13 @@ export default function FinancePOS() {
       .filter(Boolean)
       .join(" ");
 
+    // Simpan masa garansi tiket yang ditentukan teknisi
+    const dur = typeof order.warranty_duration === "number"
+      ? order.warranty_duration
+      : Number(checks._warranty_duration ?? 0);
+    const wNotes = order.warranty_notes || checks._warranty_notes || "";
+    setSelectedTicketWarranty({ duration: dur, notes: wNotes });
+
     const newTicketItems: CartItem[] = [];
 
     // 1. Service Labor item (HPP = Rp 0, selling price editable)
@@ -214,6 +222,7 @@ export default function FinancePOS() {
   // Detach selected ticket
   const handleDetachTicket = () => {
     setSelectedTicket(null);
+    setSelectedTicketWarranty({ duration: 0, notes: "" });
     setCart(cart.filter((item) => !item.is_service_labor && !item.is_from_ticket));
     toast.info("Tiket servis dilepas dari kasir");
   };
@@ -302,6 +311,7 @@ export default function FinancePOS() {
   const clearCart = () => {
     setCart([]);
     setSelectedTicket(null);
+    setSelectedTicketWarranty({ duration: 0, notes: "" });
     setCustomerName("Umum");
     setCustomerPhone("");
     setDiscountValue(0);
@@ -356,6 +366,8 @@ export default function FinancePOS() {
         ticket_id: selectedTicket ? selectedTicket.id : null,
         ticket_number: selectedTicket ? selectedTicket.ticket_number : null,
         device_info: deviceName,
+        warranty_duration: selectedTicket ? selectedTicketWarranty.duration : null,
+        warranty_notes: selectedTicket ? selectedTicketWarranty.notes : null,
         items: cart.map((item) => ({
           product_id: item.product_id || null,
           product_name: item.product_name,
@@ -601,13 +613,22 @@ export default function FinancePOS() {
                       <div className="flex items-start gap-2 min-w-0">
                         <Wrench className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
                         <div className="min-w-0 text-xs">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-purple-400 font-mono">
                               #{selectedTicket.ticket_number}
                             </span>
                             <Badge variant="outline" className="text-[9px] bg-purple-500/20 text-purple-300 border-none px-1.5 py-0">
                               {selectedTicket.status}
                             </Badge>
+                            {selectedTicketWarranty.duration > 0 ? (
+                              <Badge variant="outline" className="text-[9px] bg-emerald-500/20 text-emerald-300 border-emerald-500/30 px-1.5 py-0">
+                                Garansi: {selectedTicketWarranty.duration} Hari
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[9px] text-muted-foreground border-border px-1.5 py-0">
+                                Tanpa Garansi
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-foreground font-medium truncate mt-0.5">
                             {[selectedTicket.device_type, selectedTicket.device_brand, selectedTicket.device_model]
@@ -1137,7 +1158,7 @@ export default function FinancePOS() {
                           </div>
 
                           {/* Technician Notes & Parts Summary */}
-                          {(techActionNote || parts.length > 0 || laborCost > 0) && (
+                          {(techActionNote || parts.length > 0 || laborCost > 0 || ticket.warranty_duration || checks._warranty_duration) && (
                             <div className="pt-1.5 flex items-center gap-2 flex-wrap text-[11px]">
                               {techActionNote && (
                                 <span className="bg-muted px-2 py-0.5 rounded text-foreground font-medium">
@@ -1154,6 +1175,14 @@ export default function FinancePOS() {
                                   Estimasi Jasa: {formatRupiah(laborCost)}
                                 </span>
                               )}
+                              {(() => {
+                                const wDur = typeof ticket.warranty_duration === "number" ? ticket.warranty_duration : (checks._warranty_duration ?? 0);
+                                return (
+                                  <Badge variant="outline" className={`text-[10px] ${wDur > 0 ? "border-purple-500/40 text-purple-300 bg-purple-500/10" : "border-border text-muted-foreground"}`}>
+                                    {wDur > 0 ? `Garansi: ${wDur} Hari` : "Tanpa Garansi"}
+                                  </Badge>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
@@ -1282,6 +1311,29 @@ export default function FinancePOS() {
                       <span>Kembalian</span>
                       <span>{formatRupiah(printedInvoice.change_amount)}</span>
                     </div>
+                  )}
+                </div>
+
+                {/* Masa Garansi pada Struk */}
+                <div className="pt-2 border-t border-dashed border-border space-y-0.5 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Masa Garansi Servis:</span>
+                    <span className="font-bold text-foreground">
+                      {printedInvoice.warranty_duration && printedInvoice.warranty_duration > 0
+                        ? `${printedInvoice.warranty_duration} Hari`
+                        : "Tanpa Garansi"}
+                    </span>
+                  </div>
+                  {printedInvoice.warranty_duration && printedInvoice.warranty_duration > 0 && printedInvoice.warranty_end_date && (
+                    <div className="flex justify-between text-[10px] text-emerald-400">
+                      <span>Berlaku Hingga:</span>
+                      <span>{format(parseISO(printedInvoice.warranty_end_date), "dd MMMM yyyy", { locale: idLocale })}</span>
+                    </div>
+                  )}
+                  {printedInvoice.warranty_notes && (
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Ketentuan: {printedInvoice.warranty_notes}
+                    </p>
                   )}
                 </div>
 
