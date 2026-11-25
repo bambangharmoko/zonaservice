@@ -72,7 +72,7 @@ export default function DashboardHome() {
       const safeOrders = orders || [];
       const now = new Date();
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const staleStatuses = ["Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"];
+      const staleStatuses = ["Diterima", "Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"];
       const inProgressStatuses = ["Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"];
 
       setStats({
@@ -150,10 +150,14 @@ export default function DashboardHome() {
   const paginatedOrders = allOrders.slice((safePage - 1) * RECENT_PER_PAGE, safePage * RECENT_PER_PAGE);
   const staleTechOrders = allOrders
     .filter((o) => {
-      const staleStatuses = ["Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"];
+      const staleStatuses = ["Diterima", "Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"];
       return isTechnician && o.assigned_technician === user?.id && staleStatuses.includes(o.status) && Date.now() - new Date(o.updated_at).getTime() > 24 * 60 * 60 * 1000;
     })
     .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+
+  const newAssignedOrders = allOrders.filter(
+    (o) => isTechnician && o.assigned_technician === user?.id && o.status === "Diterima"
+  );
 
   const saveDelayReason = async (orderId: string) => {
     const reason = delayReasons[orderId]?.trim();
@@ -278,6 +282,29 @@ export default function DashboardHome() {
             </Button>
           </div>
         </div>
+
+        {isTechnician && newAssignedOrders.length > 0 && (
+          <Card className="border-primary/40 bg-primary/5 shadow-sm">
+            <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+                  <Wrench className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">
+                    Ada {newAssignedOrders.length} tiket servis baru yang ditugaskan kepada Anda!
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Tiket berstatus Diterima dan siap untuk Anda mulai proses diagnosa/pengerjaan.
+                  </p>
+                </div>
+              </div>
+              <Button size="sm" className="gradient-primary shrink-0 gap-1.5" onClick={() => navigate("/dashboard/orders")}>
+                <Wrench className="h-3.5 w-3.5" /> Buka Tugas Saya
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {staleTechOrders.length > 0 && (
           <Card className="border-destructive/40 bg-destructive/5 shadow-sm transition-all duration-200">

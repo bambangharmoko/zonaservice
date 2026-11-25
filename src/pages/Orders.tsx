@@ -20,7 +20,7 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogFooter, AlertDialogAction, AlertDialogCancel, AlertDialogDescription,
 } from "@/components/ui/alert-dialog";
-import { Search, Plus, MessageCircle, Eye, Hand, X, ChevronLeft, ChevronRight, RefreshCw, ClipboardList, PackageCheck, AlertTriangle, QrCode } from "lucide-react";
+import { Search, Plus, MessageCircle, Eye, Hand, X, ChevronLeft, ChevronRight, RefreshCw, ClipboardList, PackageCheck, AlertTriangle, QrCode, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { openDirectWhatsApp } from "@/lib/whatsapp";
@@ -107,19 +107,18 @@ export default function OrdersPage() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useSessionStorageState("orders_page", 1);
-  const [activeTab, setActiveTab] = useSessionStorageState("orders_tab", "open");
-  const [loadingOrders, setLoadingOrders] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
-  const [claimConfirmOpen, setClaimConfirmOpen] = useState(false);
   const fetchRunRef = useRef(0);
   const { user, hasRole, loading: authLoading, isApproved } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const activeFilter = searchParams.get("filter") || "";
-
   const isTechnician = hasRole("technician") && !hasRole("admin") && !hasRole("owner");
+  const [activeTab, setActiveTab] = useSessionStorageState("orders_tab", isTechnician ? "mine" : "open");
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [claimConfirmOpen, setClaimConfirmOpen] = useState(false);
+  const activeFilter = searchParams.get("filter") || "";
   const fetchOrders = useCallback(async () => {
     if (authLoading || !user || !isApproved) return;
 
@@ -263,13 +262,18 @@ export default function OrdersPage() {
   const openPool = filtered
     .filter((o) => o.status === "Diterima" && !o.assigned_technician)
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  const activeWorkStatuses = ["Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"];
+  const activeWorkStatuses = ["Diterima", "Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"];
   const finishedWorkStatuses = ["Selesai", "Siap diAmbil", "Close"];
   const threeMonthsAgo = new Date();
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
   const myTickets = filtered
     .filter((o) => o.assigned_technician === user?.id && activeWorkStatuses.includes(o.status))
-    .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+    .sort((a, b) => {
+      // Prioritaskan tiket berstatus Diterima di urutan teratas agar teknisi segera melihat tugas barunya
+      if (a.status === "Diterima" && b.status !== "Diterima") return -1;
+      if (b.status === "Diterima" && a.status !== "Diterima") return 1;
+      return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+    });
   const completedTickets = filtered
     .filter(
       (o) =>
@@ -401,6 +405,11 @@ export default function OrdersPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-bold text-sm">{o.ticket_number}</p>
                   <StatusBadge status={o.status} />
+                  {isTechnician && o.status === "Diterima" && o.assigned_technician === user?.id && (
+                    <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[11px] font-semibold">
+                      Baru Ditugaskan
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{o.service_type}</p>
               </div>
@@ -427,9 +436,15 @@ export default function OrdersPage() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/orders/${o.ticket_number}`)}>
-              <Eye className="h-3 w-3 mr-1" /> Detail
-            </Button>
+            {isTechnician && o.status === "Diterima" && o.assigned_technician === user?.id ? (
+              <Button size="sm" className="gradient-primary" onClick={() => navigate(`/dashboard/orders/${o.ticket_number}`)}>
+                <Wrench className="h-3 w-3 mr-1" /> Mulai Diagnosa
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/orders/${o.ticket_number}`)}>
+                <Eye className="h-3 w-3 mr-1" /> Detail
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => sendWhatsApp(o)}>
               <MessageCircle className="h-3 w-3" />
             </Button>
@@ -592,9 +607,14 @@ export default function OrdersPage() {
                   Tiket Terbuka ({openPool.length})
                 </TabsTrigger>
                 <TabsTrigger value="mine" className="min-w-44 flex-1">
-                  Sedang Dikerjakan ({myTickets.length})
+                  Tugas Saya ({myTickets.length})
+                  {myTickets.filter((o) => o.status === "Diterima").length > 0 && (
+                    <span className="ml-1.5 rounded-full bg-primary text-primary-foreground px-1.5 py-0.5 text-[10px] font-semibold">
+                      {myTickets.filter((o) => o.status === "Diterima").length} baru
+                    </span>
+                  )}
                   {myTickets.filter((o) => ["Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"].includes(o.status) && Date.now() - new Date(o.updated_at).getTime() > 24 * 60 * 60 * 1000).length > 0 && (
-                    <span className="ml-2 rounded-full bg-destructive px-1.5 text-[10px] text-destructive-foreground">
+                    <span className="ml-1.5 rounded-full bg-destructive px-1.5 text-[10px] text-destructive-foreground">
                       {myTickets.filter((o) => ["Diagnosa", "Menunggu Persetujuan Pelanggan", "Menunggu Sparepart", "Perbaikan"].includes(o.status) && Date.now() - new Date(o.updated_at).getTime() > 24 * 60 * 60 * 1000).length}
                     </span>
                   )}
