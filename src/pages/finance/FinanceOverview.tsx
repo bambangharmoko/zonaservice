@@ -17,6 +17,7 @@ import {
   Calendar,
   PlusCircle,
   ShoppingBag,
+  FileText,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -420,7 +421,7 @@ export default function FinanceOverview() {
         </Card>
 
         {/* Quick Navigation Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           <Link to="/dashboard/finance/pos" className="group">
             <Card className="h-full border-border/60 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3.5">
@@ -439,6 +440,24 @@ export default function FinanceOverview() {
             </Card>
           </Link>
 
+          <Link to="/dashboard/finance/quotations" className="group">
+            <Card className="h-full border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm group-hover:text-primary transition-colors">
+                    Penawaran (Quotation)
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Surat penawaran resmi A4 instansi/corporate
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
           <Link to="/dashboard/finance/inventory" className="group">
             <Card className="h-full border-border/60 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3.5">
@@ -450,7 +469,7 @@ export default function FinanceOverview() {
                     Manajemen Stok Barang
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Kelola harga modal, harga jual, dan kulakan stok
+                    Kelola harga modal, harga jual, dan stok
                   </p>
                 </div>
               </CardContent>

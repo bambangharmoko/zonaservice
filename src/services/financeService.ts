@@ -95,6 +95,47 @@ export interface FinanceExpense {
   updated_at: string;
 }
 
+export interface FinanceQuotationItem {
+  id: string;
+  quotation_id?: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  is_sparepart?: boolean;
+  created_at?: string;
+}
+
+export interface FinanceQuotation {
+  id: string;
+  quotation_number: string;
+  ticket_id: string;
+  ticket_number: string;
+  date: string;
+  valid_until: string;
+  customer_name: string;
+  customer_company?: string | null;
+  customer_phone: string;
+  customer_email?: string | null;
+  device_info: string;
+  serial_number?: string | null;
+  accessories?: string | null;
+  damage_description?: string | null;
+  technician_diagnosis?: string | null;
+  items: FinanceQuotationItem[];
+  subtotal: number;
+  discount_type: "fixed" | "percent";
+  discount_value: number;
+  total_discount: number;
+  grand_total: number;
+  status: "draft" | "sent" | "approved" | "rejected";
+  approved_at?: string | null;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Fallback Local Storage Keys & Default Seed Data
 // ─────────────────────────────────────────────────────────────
@@ -105,6 +146,7 @@ const STORAGE_KEYS = {
   INVOICE_ITEMS: `${STORAGE_PREFIX}invoice_items`,
   STOCK_LOGS: `${STORAGE_PREFIX}stock_logs`,
   EXPENSES: `${STORAGE_PREFIX}expenses`,
+  QUOTATIONS: `${STORAGE_PREFIX}quotations`,
 };
 
 const DEFAULT_PRODUCTS: FinanceProduct[] = [
@@ -1024,5 +1066,343 @@ export const financeService = {
     }
     const local = getLocal<FinanceExpense[]>(STORAGE_KEYS.EXPENSES, []);
     setLocal(STORAGE_KEYS.EXPENSES, local.filter((e) => e.id !== id));
+  },
+
+  // ─── Quotations (Penawaran Resmi Corporate / Instansi) ───
+  async getQuotations(): Promise<FinanceQuotation[]> {
+    try {
+      const { data: quotes, error } = await supabase
+        .from("finance_quotations" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      if (quotes && quotes.length > 0) {
+        const { data: items } = await supabase
+          .from("finance_quotation_items" as any)
+          .select("*");
+
+        const itemsMap = (items || []).reduce((acc: any, it: any) => {
+          if (!acc[it.quotation_id]) acc[it.quotation_id] = [];
+          acc[it.quotation_id].push(it);
+          return acc;
+        }, {});
+
+        return (quotes as unknown as FinanceQuotation[]).map((q) => ({
+          ...q,
+          items: itemsMap[q.id] || q.items || [],
+        }));
+      }
+
+      return getLocal<FinanceQuotation[]>(STORAGE_KEYS.QUOTATIONS, []);
+    } catch {
+      return getLocal<FinanceQuotation[]>(STORAGE_KEYS.QUOTATIONS, []);
+    }
+  },
+
+  async getQuotationById(id: string): Promise<FinanceQuotation | null> {
+    const list = await this.getQuotations();
+    return list.find((q) => q.id === id) || null;
+  },
+
+  async getQuotationsByTicketId(ticketId: string): Promise<FinanceQuotation[]> {
+    const list = await this.getQuotations();
+    return list.filter((q) => q.ticket_id === ticketId || q.ticket_number === ticketId);
+  },
+
+  async generateQuotationNumber(): Promise<string> {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const year = now.getFullYear();
+    const datePrefix = `ZS${day}${month}${year}`; // Contoh: ZS26112026
+
+    const quotes = await this.getQuotations();
+    const todayQuotes = quotes.filter((q) =>
+      q.quotation_number && q.quotation_number.replace(/-/g, "").startsWith(datePrefix)
+    );
+
+    const seq = String(todayQuotes.length + 1).padStart(3, "0");
+    return `${datePrefix}${seq}`; // Contoh: ZS26112026001
+  },
+
+  async getServiceOrdersForQuotation(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from("service_orders")
+        .select("*")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.warn("Failed to fetch service orders for quotation:", err);
+      return [];
+    }
+  },
+
+  async createQuotation(payload: {
+    ticket_id: string;
+    ticket_number: string;
+    customer_name: string;
+    customer_company?: string | null;
+    customer_phone: string;
+    customer_email?: string | null;
+    device_info: string;
+    serial_number?: string | null;
+    accessories?: string | null;
+    damage_description?: string | null;
+    technician_diagnosis?: string | null;
+    items: {
+      description: string;
+      quantity: number;
+      unit_price: number;
+      is_sparepart?: boolean;
+    }[];
+    discount_type: "fixed" | "percent";
+    discount_value: number;
+    notes?: string | null;
+    created_by?: string | null;
+    author_name?: string | null;
+  }): Promise<FinanceQuotation> {
+    const now = new Date();
+    const quotation_number = await this.generateQuotationNumber();
+    const validUntilDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const valid_until = validUntilDate.toISOString().split("T")[0];
+    const dateStr = now.toISOString().split("T")[0];
+    const isoNow = now.toISOString();
+
+    const subtotal = payload.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+    let total_discount = 0;
+    if (payload.discount_type === "percent") {
+      total_discount = Math.round((subtotal * (payload.discount_value || 0)) / 100);
+    } else {
+      total_discount = Math.min(subtotal, payload.discount_value || 0);
+    }
+    const grand_total = Math.max(0, subtotal - total_discount);
+
+    const newQuotationId = `quot-${Date.now()}`;
+    const quotationItems: FinanceQuotationItem[] = payload.items.map((it, idx) => ({
+      id: `qitem-${Date.now()}-${idx}`,
+      quotation_id: newQuotationId,
+      description: it.description,
+      quantity: it.quantity,
+      unit_price: it.unit_price,
+      subtotal: it.unit_price * it.quantity,
+      is_sparepart: Boolean(it.is_sparepart),
+      created_at: isoNow,
+    }));
+
+    const quotationRecord: FinanceQuotation = {
+      id: newQuotationId,
+      quotation_number,
+      ticket_id: payload.ticket_id,
+      ticket_number: payload.ticket_number,
+      date: dateStr,
+      valid_until,
+      customer_name: payload.customer_name,
+      customer_company: payload.customer_company || null,
+      customer_phone: payload.customer_phone,
+      customer_email: payload.customer_email || null,
+      device_info: payload.device_info,
+      serial_number: payload.serial_number || null,
+      accessories: payload.accessories || null,
+      damage_description: payload.damage_description || null,
+      technician_diagnosis: payload.technician_diagnosis || null,
+      items: quotationItems,
+      subtotal,
+      discount_type: payload.discount_type,
+      discount_value: payload.discount_value,
+      total_discount,
+      grand_total,
+      status: "sent",
+      notes: payload.notes || null,
+      created_by: payload.created_by || null,
+      created_at: isoNow,
+      updated_at: isoNow,
+    };
+
+    // Attempt Supabase insert
+    try {
+      const { data, error } = await supabase
+        .from("finance_quotations" as any)
+        .insert([{
+          quotation_number,
+          ticket_id: payload.ticket_id,
+          ticket_number: payload.ticket_number,
+          date: dateStr,
+          valid_until,
+          customer_name: payload.customer_name,
+          customer_company: payload.customer_company || null,
+          customer_phone: payload.customer_phone,
+          customer_email: payload.customer_email || null,
+          device_info: payload.device_info,
+          serial_number: payload.serial_number || null,
+          accessories: payload.accessories || null,
+          damage_description: payload.damage_description || null,
+          technician_diagnosis: payload.technician_diagnosis || null,
+          subtotal,
+          discount_type: payload.discount_type,
+          discount_value: payload.discount_value,
+          total_discount,
+          grand_total,
+          status: "sent",
+          notes: payload.notes || null,
+          created_by: payload.created_by || null,
+        }])
+        .select()
+        .single();
+
+      if (!error && data) {
+        const createdQuote = data as unknown as FinanceQuotation;
+        quotationRecord.id = createdQuote.id;
+
+        // Insert items
+        const dbItems = quotationItems.map((it) => ({
+          quotation_id: createdQuote.id,
+          description: it.description,
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          subtotal: it.subtotal,
+          is_sparepart: it.is_sparepart,
+        }));
+
+        await supabase.from("finance_quotation_items" as any).insert(dbItems);
+      }
+    } catch (dbErr) {
+      console.warn("Supabase quotation insert failed, using local storage:", dbErr);
+    }
+
+    // Always update local storage
+    const localQuotes = getLocal<FinanceQuotation[]>(STORAGE_KEYS.QUOTATIONS, []);
+    setLocal(STORAGE_KEYS.QUOTATIONS, [quotationRecord, ...localQuotes]);
+
+    // Insert service update & internal note to ticket
+    if (payload.ticket_id) {
+      try {
+        const author = payload.author_name || "Finance";
+        await supabase.from("service_updates").insert({
+          order_id: payload.ticket_id,
+          status: "Menunggu Persetujuan Pelanggan" as any,
+          description: `[SURAT PENAWARAN RESMI] Diterbitkan No. ${quotation_number} sebesar Rp ${grand_total.toLocaleString("id-ID")} oleh ${author}. Berlaku s/d ${valid_until}.`,
+          updated_by: payload.created_by || undefined,
+        });
+
+        // Store quotation summary in ticket's unit_checks
+        const { data: ticketData } = await supabase
+          .from("service_orders")
+          .select("unit_checks")
+          .eq("id", payload.ticket_id)
+          .single();
+
+        const currentChecks = (ticketData?.unit_checks || {}) as Record<string, any>;
+        await supabase
+          .from("service_orders")
+          .update({
+            unit_checks: {
+              ...currentChecks,
+              _latest_quotation: {
+                id: quotationRecord.id,
+                quotation_number,
+                grand_total,
+                date: dateStr,
+                valid_until,
+                status: "sent",
+              },
+            } as any,
+          })
+          .eq("id", payload.ticket_id);
+      } catch (err) {
+        console.warn("Failed to attach quotation update to ticket:", err);
+      }
+    }
+
+    return quotationRecord;
+  },
+
+  async updateQuotationStatus(
+    id: string,
+    newStatus: "draft" | "sent" | "approved" | "rejected",
+    options?: {
+      authorName?: string;
+      userId?: string;
+      nextTicketStatus?: string;
+    }
+  ): Promise<FinanceQuotation> {
+    const now = new Date().toISOString();
+    let updatedQuote: FinanceQuotation | null = null;
+
+    try {
+      const updatePayload: any = {
+        status: newStatus,
+        updated_at: now,
+      };
+      if (newStatus === "approved") {
+        updatePayload.approved_at = now;
+      }
+
+      const { data, error } = await supabase
+        .from("finance_quotations" as any)
+        .update(updatePayload)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (!error && data) {
+        updatedQuote = data as unknown as FinanceQuotation;
+      }
+    } catch {
+      // local fallback below
+    }
+
+    const localQuotes = getLocal<FinanceQuotation[]>(STORAGE_KEYS.QUOTATIONS, []);
+    const existing = localQuotes.find((q) => q.id === id);
+    if (existing) {
+      updatedQuote = {
+        ...existing,
+        status: newStatus,
+        approved_at: newStatus === "approved" ? now : existing.approved_at,
+        updated_at: now,
+      };
+      setLocal(
+        STORAGE_KEYS.QUOTATIONS,
+        localQuotes.map((q) => (q.id === id ? updatedQuote! : q))
+      );
+    }
+
+    if (!updatedQuote) throw new Error("Penawaran tidak ditemukan");
+
+    // If approved or rejected, update ticket status and log
+    if (updatedQuote.ticket_id) {
+      try {
+        const author = options?.authorName || "Finance";
+        if (newStatus === "approved") {
+          const nextStatus = options?.nextTicketStatus || "Perbaikan";
+          await supabase
+            .from("service_orders")
+            .update({ status: nextStatus as any })
+            .eq("id", updatedQuote.ticket_id);
+
+          await supabase.from("service_updates").insert({
+            order_id: updatedQuote.ticket_id,
+            status: nextStatus as any,
+            description: `[PENAWARAN DISETUJUI] Pelanggan menyetujui Surat Penawaran ${updatedQuote.quotation_number} (Rp ${updatedQuote.grand_total.toLocaleString("id-ID")}). Dikonfirmasi oleh ${author}.`,
+            updated_by: options?.userId,
+          });
+        } else if (newStatus === "rejected") {
+          await supabase.from("service_updates").insert({
+            order_id: updatedQuote.ticket_id,
+            status: "Menunggu Persetujuan Pelanggan" as any,
+            description: `[PENAWARAN DITOLAK] Penawaran ${updatedQuote.quotation_number} tidak disetujui / ditolak oleh pelanggan. Dicatat oleh ${author}.`,
+            updated_by: options?.userId,
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to sync quotation status to service ticket:", err);
+      }
+    }
+
+    return updatedQuote;
   },
 };

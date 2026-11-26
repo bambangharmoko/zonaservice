@@ -53,6 +53,7 @@ import {
   UserCheck,
   Wrench,
   Boxes,
+  FileText,
 } from "lucide-react";
 import { financeService, FinanceProduct, TicketSparepart } from "@/services/financeService";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -2606,6 +2607,47 @@ export default function OrderDetailPage() {
           </Card>
         )}
 
+        {/* Banner Surat Penawaran Resmi (Jika ada) */}
+        {(order.unit_checks as any)?._latest_quotation && (
+          <Card className="border-primary/40 bg-primary/5 print:hidden">
+            <CardContent className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-primary/10 text-primary rounded-lg shrink-0">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-xs text-foreground flex items-center gap-1.5 flex-wrap">
+                    <span>Surat Penawaran Resmi:</span>
+                    <span className="font-mono text-primary font-bold">
+                      {(order.unit_checks as any)._latest_quotation.quotation_number}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      {(order.unit_checks as any)._latest_quotation.status === "approved"
+                        ? "Disetujui"
+                        : (order.unit_checks as any)._latest_quotation.status === "rejected"
+                        ? "Ditolak"
+                        : "Terkirim"}
+                    </Badge>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Total: {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format((order.unit_checks as any)._latest_quotation.grand_total || 0)} • Berlaku s/d: {(order.unit_checks as any)._latest_quotation.valid_until}
+                  </p>
+                </div>
+              </div>
+              {(isAdminOrOwner || hasRole("finance")) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1 shrink-0"
+                  onClick={() => navigate(`/dashboard/finance/quotations?ticketId=${order.id}`)}
+                >
+                  <ExternalLink className="h-3 w-3" /> Buka Penawaran
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Status Actions */}
         {order.status !== "Close" && order.status !== "Cancelled" && canUpdateStatus && (
           <Card className="print:hidden">
@@ -2618,6 +2660,17 @@ export default function OrderDetailPage() {
                   className="bg-success text-success-foreground hover:bg-success/90"
                 >
                   <CheckCircle className="h-4 w-4 mr-1" /> Konfirmasi & Kirim ke Pelanggan
+                </Button>
+              )}
+              {/* Button Penawaran Resmi untuk Finance / Admin / Owner */}
+              {order.status === "Menunggu Persetujuan Pelanggan" && (isAdminOrOwner || hasRole("finance")) && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/dashboard/finance/quotations?ticketId=${order.id}`)}
+                  className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                >
+                  <FileText className="h-4 w-4" />
+                  {(order.unit_checks as any)?._latest_quotation ? "Kelola Penawaran A4" : "Buat Penawaran Resmi (A4)"}
                 </Button>
               )}
               {/* Next status buttons — supports multiple options for branching flows */}

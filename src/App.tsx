@@ -28,6 +28,7 @@ const ClosedTicketsManager = lazy(() => import("./pages/ClosedTicketsManager"));
 const AiTraining = lazy(() => import("./pages/AiTraining"));
 const FinanceOverview = lazy(() => import("./pages/finance/FinanceOverview"));
 const FinancePOS = lazy(() => import("./pages/finance/FinancePOS"));
+const FinanceQuotations = lazy(() => import("./pages/finance/FinanceQuotations"));
 const FinanceInventory = lazy(() => import("./pages/finance/FinanceInventory"));
 const FinanceExpenses = lazy(() => import("./pages/finance/FinanceExpenses"));
 const FinanceReports = lazy(() => import("./pages/finance/FinanceReports"));
@@ -66,6 +67,7 @@ const App = () => (
                 {/* Sub-Dashboard Finance Routes */}
                 <Route path="/dashboard/finance" element={<ProtectedRoute><FinanceRoute><FinanceOverview /></FinanceRoute></ProtectedRoute>} />
                 <Route path="/dashboard/finance/pos" element={<ProtectedRoute><FinanceRoute><FinancePOS /></FinanceRoute></ProtectedRoute>} />
+                <Route path="/dashboard/finance/quotations" element={<ProtectedRoute><FinanceRoute><FinanceQuotations /></FinanceRoute></ProtectedRoute>} />
                 <Route path="/dashboard/finance/inventory" element={<ProtectedRoute><FinanceRoute><FinanceInventory /></FinanceRoute></ProtectedRoute>} />
                 <Route path="/dashboard/finance/expenses" element={<ProtectedRoute><FinanceRoute><FinanceExpenses /></FinanceRoute></ProtectedRoute>} />
                 <Route path="/dashboard/finance/reports" element={<ProtectedRoute><FinanceRoute><FinanceReports /></FinanceRoute></ProtectedRoute>} />

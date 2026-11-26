@@ -15,6 +15,7 @@ import {
   ArrowDownRight,
   FileSpreadsheet,
   DollarSign,
+  FileText,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ const adminNavItems = [
 const financeNavItems = [
   { label: "Ringkasan Keuangan", path: "/dashboard/finance", icon: LayoutDashboard, roles: ["owner", "finance"] as const },
   { label: "Kasir & Buat Nota", path: "/dashboard/finance/pos", icon: Receipt, roles: ["owner", "finance"] as const },
+  { label: "Penawaran (Quotation)", path: "/dashboard/finance/quotations", icon: FileText, roles: ["owner", "finance"] as const },
   { label: "Stok Barang", path: "/dashboard/finance/inventory", icon: Package, roles: ["owner", "finance"] as const },
   { label: "Pengeluaran", path: "/dashboard/finance/expenses", icon: ArrowDownRight, roles: ["owner", "finance"] as const },
   { label: "Laporan Ringkas", path: "/dashboard/finance/reports", icon: FileSpreadsheet, roles: ["owner", "finance"] as const },
